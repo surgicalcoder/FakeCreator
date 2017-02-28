@@ -1,0 +1,27 @@
+﻿@using RazorEngine
+@using FakeCreator2
+@inherits RazorEngine.Templating.TemplateBase<Mapping>
+<div class="box box-block bg-white" *ngIf="user">
+    <h5>Editing @Model.Name {{ @Raw(Model.Name.ToLower() + ".Name") }}</h5>
+    {{ f.value | json }}
+
+    <form novalidate #f="ngForm" (ngSubmit)="saveDetails()">
+        
+        @foreach (var item in Model.Mappings)
+        {
+            <div class="form-group row">
+                <label for="@item.Name" class="col-sm-2 col-form-label">@item.Name</label>
+                <div class="col-sm-10">
+                    <input type="text" class="form-control" id="Name" name="@item.Name" [(ngModel)]="@Raw(Model.Name.ToLower() + "." + item.Name)" placeholder="@item.Name">
+                </div>
+            </div>
+        }
+
+        <div class="pull-right btn">
+            <button type="submit" [disabled]="!f.form.valid">Save</button>
+        </div>
+    </form>
+
+    <div class="clearfix">&nbsp;</div>
+
+</div>
