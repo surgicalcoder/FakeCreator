@@ -4,15 +4,13 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text;
-using System.Threading.Tasks;
 using Jil;
 using PowerArgs;
-using Utilities.DataTypes.ExtensionMethods;
-using RazorEngine;
 using RazorEngine.Configuration;
 using RazorEngine.Templating;
+using Utilities.DataTypes.ExtensionMethods;
 
-namespace FakeCreator2
+namespace FakeCreator
 {
     public class InputArgs
     {
@@ -26,6 +24,7 @@ namespace FakeCreator2
         public bool ExtrapolateTypes { get; set; }
 
         [ArgRequired]
+        [ArgDescription("Generates a new mapping file, then runs mapping. If false, then uses existing mapping file.")]
         public bool GenerateMappingFile { get; set; }
 
         public List<string> Types { get; set; }
@@ -62,7 +61,7 @@ namespace FakeCreator2
             try
             {
                 var parsed = Args.Parse<InputArgs>(args);
-
+                
                 string[] FileToLoad = parsed.Dll.Split(';');
                 parsed.Types = parsed.RawTypes.Split(',').ToList();
                 inputArgs = parsed;
@@ -77,6 +76,7 @@ namespace FakeCreator2
                 if (parsed.GenerateMappingFile)
                 {
                     GenerateMapping();
+                    GenerateClasses();
                 }
                 else
                 {
@@ -140,6 +140,19 @@ namespace FakeCreator2
             File.WriteAllText(inputArgs.MappingFile + ".ToSource.cs", forRemote.ToString());
             File.WriteAllText(inputArgs.MappingFile + ".classes.ts", typescriptFile.ToString());
             File.WriteAllText(inputArgs.MappingFile + ".FromSource.ts", typescriptFromRemote.ToString());
+            File.WriteAllText(inputArgs.MappingFile + ".run.bat", "\"" + Assembly.GetExecutingAssembly().Location + "\" " + string.Join(" ",  GetCommandargs() ));
+        }
+
+        private static string[] GetCommandargs()
+        {
+            return Environment.GetCommandLineArgs().Where(r=>r.ToLower() != "fakecreator" && r.ToLower() != Assembly.GetExecutingAssembly().Location.ToLower()).Select((s, i) =>
+            {
+                if (s.Contains(" "))
+                {
+                    return "\"" + s + "\"";
+                }
+                return s;
+            }).ToArray();
         }
 
         private static string PerformRazor(string file, string template, Mapping mapping)

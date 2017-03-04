@@ -1,6 +1,5 @@
 ﻿@using RazorEngine
-@using FakeCreator2
-@inherits RazorEngine.Templating.TemplateBase<Mapping>
+@inherits RazorEngine.Templating.TemplateBase<FakeCreator.Mapping>
 <div class="box box-block bg-white" *ngIf="user">
     <h5>Editing @Model.Name {{ @Raw(Model.Name.ToLower() + ".Name") }}</h5>
     {{ f.value | json }}
