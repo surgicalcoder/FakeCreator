@@ -233,7 +233,7 @@ namespace FakeCreator2
             string inputTypeName = $"{inputArgs.ClassPrefix ?? ""}{type.Name}{inputArgs.ClassPostfix ?? ""}";
             string methodName = GetRemotePopulatorDTOMethodName(outputTypeName);
 
-            builder.AppendLine($"public static {outputTypeName} {methodName} ({inputTypeName} remote, {outputTypeName} local) {{");
+            builder.AppendLine($"public static {outputTypeName} {methodName} ({inputTypeName} remote, {outputTypeName} local = null) {{");
             builder.AppendLine($"\tif (local == null) {{local = new {outputTypeName}();}}");
 
             foreach (var propertyMapping in mapping.Mappings)
