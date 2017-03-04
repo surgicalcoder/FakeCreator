@@ -274,7 +274,7 @@ namespace FakeCreator2
                     }
                     else
                     {
-                        builder.AppendLine($"\tif (remote.{remotePropertyName} != null) {{ local.{localPropertyName} = {GetRemotePopulatorDTOMethodName(localPropertyType)} (remote.{remotePropertyName}); }}");
+                        builder.AppendLine($"\tif (remote.{remotePropertyName} != null) {{ local.{localPropertyName} = { GetRemotePopulatorDTOMethodName(remotePropertyType)} (remote.{remotePropertyName}); }}");
                     }
 
                 }
@@ -295,7 +295,7 @@ namespace FakeCreator2
                         }
                         else
                         {
-                            builder.AppendLine($"\t if (remote.{remotePropertyName} != null && remote.{remotePropertyName}.Any()) {{ local.{localPropertyName} = remote.{remotePropertyName}.Select(r=> {GetRemotePopulatorDTOMethodName(localPropertyType)}(r) ).ToList();  }} ");
+                            builder.AppendLine($"\t if (remote.{remotePropertyName} != null && remote.{remotePropertyName}.Any()) {{ local.{localPropertyName} = remote.{remotePropertyName}.Select(r=> {GetRemotePopulatorDTOMethodName(remotePropertyType)}(r) ).ToList();  }} ");
                         }
                     }
                 }
