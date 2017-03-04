@@ -129,8 +129,8 @@ namespace FakeCreator2
                 }
                         
 
-                fromRemote.AppendLine(OutputFromRemote(mapping));
-                forRemote.AppendLine(OutputForDTO(mapping));
+                fromRemote.AppendLine(OutputFromSource(mapping));
+                forRemote.AppendLine(OutputForToSource(mapping));
                 typescriptFile.AppendLine(GenerateTypeScriptFile(mapping));
                 typescriptFromRemote.AppendLine(GenerateTypeScriptFromRemoteFile(mapping));
             }
@@ -220,7 +220,7 @@ namespace FakeCreator2
 
         }
 
-        private static string OutputForDTO(Mapping mapping)
+        private static string OutputForToSource(Mapping mapping)
         {
             if (mapping.IsEnum)
             {
@@ -259,11 +259,11 @@ namespace FakeCreator2
                     }
                     else if (propertyMapping.IsNullable)
                     {
-                        builder.AppendLine($"\tif (remote.{remotePropertyName} != null) {{ local.{localPropertyName} = ({localPropertyType}) Enum.Parse(typeof({localPropertyType}), remote.{remotePropertyName}.ToString() ); }}");
+                        builder.AppendLine($"\tif (remote.{remotePropertyName} != null) {{ local.{localPropertyName} = ({remotePropertyType}) Enum.Parse(typeof({remotePropertyType}), remote.{remotePropertyName}.ToString() ); }}");
                     }
                     else
                     {
-                        builder.AppendLine($"\tlocal.{localPropertyName} = ({localPropertyType}) Enum.Parse(typeof({localPropertyType}), remote.{remotePropertyName}.ToString() );");
+                        builder.AppendLine($"\tlocal.{localPropertyName} = ({remotePropertyType}) Enum.Parse(typeof({remotePropertyType}), remote.{remotePropertyName}.ToString() );");
                     }
                 }
                 else if (propertyMapping.IsNullable)
@@ -336,7 +336,7 @@ namespace FakeCreator2
             return builder.ToString();
         }
 
-        private static string OutputFromRemote(Mapping mapping)
+        private static string OutputFromSource(Mapping mapping)
         {
             if (mapping.IsEnum)
             {
