@@ -62,8 +62,8 @@ namespace FakeCreator
             {
                 var parsed = Args.Parse<InputArgs>(args);
                 
-                string[] FileToLoad = parsed.Dll.Split(';');
-                parsed.Types = parsed.RawTypes.Split(',').ToList();
+                string[] FileToLoad = parsed.Dll.Split(new char[] { ',', ';' });
+                parsed.Types = parsed.RawTypes.Split(new char[] {',',';'}).ToList();
                 inputArgs = parsed;
 
                 assemblies = new List<Assembly>();
