@@ -145,7 +145,7 @@ namespace FakeCreator
 
         private static string[] GetCommandargs()
         {
-            return Environment.GetCommandLineArgs().Where(r=>r.ToLower() != "fakecreator" && r.ToLower() != Assembly.GetExecutingAssembly().Location.ToLower()).Select((s, i) =>
+            return Environment.GetCommandLineArgs().Skip(1).Select((s, i) =>
             {
                 if (s.Contains(" "))
                 {
