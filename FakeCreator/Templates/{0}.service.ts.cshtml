@@ -1,0 +1,47 @@
+﻿@using RazorEngine
+@inherits RazorEngine.Templating.TemplateBase<FakeCreator.Mapping>
+
+import { Http, Response, Headers } from '@@angular/http';
+import { Injectable } from "@@angular/core";
+import { Observable } from "rxjs";
+
+import { SiteSettings } from '../settings.service';
+import { URLSettings } from '../url.service';
+import Service = require("../_common/SecurityService");
+
+
+import {@Model.Name.ToLower()} from "./@Raw(Model.Name.ToLower() + ".class")";
+
+@@Injectable()
+export class @Model.Name.ToLower()Service {
+
+    private baseUrl: string = this.url.frontEndUrl + '@Model.Name.ToLower()';
+
+    constructor(private http: Http, private url: URLSettings, private secService: Service.SecurityService, ) { }
+
+    getAll(): Observable<@Raw(Model.Name.ToLower() + "[]")>
+    {
+    let item$ = this.http
+    .get(`${this.baseUrl}/@Model.Name.ToLower()`, {headers: this.secService.getHeaders() })
+    .map(@Raw("map" + Model.Name + "s"));
+    return item$;
+    }
+
+    @Raw("get" + Model.Name) (id: string): Observable<@Model.Name.ToLower()>
+        {
+        let item$ = this.http
+        .get(`${this.baseUrl}/@Model.Name.ToLower()/${id}`, { headers: this.secService.getHeaders() })
+        .map(@Raw("map" + Model.Name));
+        return item$;
+        }
+
+
+        }
+
+        function @Raw("map" + Model.Name)(response: Response): @Model.Name.ToLower() {
+            return @Raw("to" + Model.Name)  (response.json());
+        }
+
+        function @Raw("map" + Model.Name + "s")(response: Response): @Raw(Model.Name.ToLower() + "[]") {
+            return response.json().map(@Raw("map" + Model.Name));
+        }
