@@ -1,0 +1,38 @@
+﻿@using RazorEngine
+@inherits RazorEngine.Templating.TemplateBase<FakeCreator.Mapping>
+
+import { Observable } from 'rxjs/Observable';
+import { Component, OnInit } from '@@angular/core';
+import { Router, ActivatedRoute, Params } from '@@angular/router';
+import {UsersService} from './users.service'
+import {User} from "./user.class";
+declare var module: any;
+
+@@Component({
+    moduleId: module.id.replace("/js/","/ts/"),
+    templateUrl: 'html/nodes-list.component.html',
+})
+
+export class UsersListComponent implements OnInit{
+
+    items: Observable<@Model.Name.ToString() []>;
+
+    private selectedId:string;
+
+    constructor (private service: @Model.Name.ToString()Service, private route: ActivatedRoute, private router: Router){}
+
+    ngOnInit()
+    {
+        items.users = this.service.getAll().switchMap((params:Params)=>{
+            this.selectedId = params['id'];
+            return this.service.getAll();
+        });
+    }
+
+    isSelected(@Model.Name.ToLower(): @Model.Name.ToString()){return @Model.Name.ToString() .Id == this.selectedId;}
+
+    onSelect(@Model.Name.ToLower(): @Model.Name.ToString()) {
+        this.router.navigate(['/@Model.Name.ToString()/', user.Id]);
+    }
+
+    }
