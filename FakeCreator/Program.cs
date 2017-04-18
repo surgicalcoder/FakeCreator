@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -123,9 +124,13 @@ namespace FakeCreator
 
                 foreach (var additionalTemplate in additionalTemplates)
                 {
+                    Console.WriteLine($"[{mapping.Name}] Processing Template {additionalTemplate.Key}");
                     var directory = Path.GetDirectoryName(inputArgs.MappingFile);
-
-                    File.WriteAllText(Path.Combine(directory,string.Format(additionalTemplate.Key, mapping.Name )).Replace(".cshtml","") , PerformRazor(additionalTemplate.Key,additionalTemplate.Value, mapping) );
+                    if (!Directory.Exists(Path.Combine(directory, mapping.Name)))
+                    {
+                        Directory.CreateDirectory(Path.Combine(directory, mapping.Name));
+                    }
+                    File.WriteAllText(Path.Combine(directory, mapping.Name, string.Format(additionalTemplate.Key, mapping.Name )).Replace(".cshtml","") , PerformRazor(additionalTemplate.Key,additionalTemplate.Value, mapping) );
                 }
                         
 
@@ -671,6 +676,7 @@ namespace FakeCreator
         }
     }
 
+    [DebuggerDisplay("{FullName}")]
     public class Mapping
     {
         public string Name { get; set; }
@@ -679,9 +685,15 @@ namespace FakeCreator
         public bool IsMainType { get; set; }
         public bool IsEnum { get; set; }
         public bool IsAReference { get; set; }
+
+        public override string ToString()
+        {
+            return $"{nameof(FullName)}: {FullName}";
+        }
+
         public List<PropertyMapping> Mappings { get; set; }
     }
-
+    [DebuggerDisplay("{Name}")]
     public class PropertyMapping
     {
         public string Name { get; set; }

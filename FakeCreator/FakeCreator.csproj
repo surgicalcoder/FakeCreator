@@ -83,8 +83,6 @@
     <None Include="App.config" />
     <None Include="packages.config" />
     <None Include="Templates\AngularForm-{0}.html.cshtml" />
-    <None Include="Templates\{0}.module.ts.cshtml" />
-    <None Include="Templates\{0}.service.ts.cshtml" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
