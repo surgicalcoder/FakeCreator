@@ -76,6 +76,7 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Generators\CSharp\CsharpNullableClassOutputGenerator.cs" />
     <Compile Include="Generators\CSharp\CsharpClassOutputGenerator.cs" />
     <Compile Include="Generators\CSharp\CsharpEnumOutputGenerator.cs" />
     <Compile Include="Generators\CSharp\FromSourceOutputGenerator.cs" />
