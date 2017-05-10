@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace FakeCreator.Generators
+namespace FakeCreator.Generators.TypeScript
 {
     public class TypescriptClassOutputGenerator : IOutputGenerator
     {

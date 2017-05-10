@@ -2,7 +2,7 @@ using System;
 using System.Linq;
 using System.Text;
 
-namespace FakeCreator.Generators
+namespace FakeCreator.Generators.CSharp
 {
     public class ToSourceOutputGenerator : IOutputGenerator
     {
