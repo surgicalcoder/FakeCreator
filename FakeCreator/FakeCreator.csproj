@@ -76,22 +76,27 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Class1.cs" />
+    <Compile Include="Generators\CSharp\CsharpClassOutputGenerator.cs" />
+    <Compile Include="Generators\CSharp\CsharpEnumOutputGenerator.cs" />
+    <Compile Include="Generators\CSharp\FromSourceOutputGenerator.cs" />
     <Compile Include="Helpers.cs" />
     <Compile Include="InputArgs.cs" />
+    <Compile Include="IOutputGenerator.cs" />
     <Compile Include="Mapping.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="PropertyMapping.cs" />
+    <Compile Include="Singleton.cs" />
+    <Compile Include="Generators\CSharp\ToSourceOutputGenerator.cs" />
+    <Compile Include="Generators\TypeScript\TypescriptClassOutputGenerator.cs" />
+    <Compile Include="Generators\TypeScript\TypescriptMappingOutputGenerator.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
     <None Include="packages.config" />
     <None Include="Templates\AngularForm-{0}.html.cshtml" />
   </ItemGroup>
-  <ItemGroup>
-    <Folder Include="Generators\" />
-  </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
