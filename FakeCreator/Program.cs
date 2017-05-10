@@ -137,7 +137,7 @@ namespace FakeCreator
                 foreach (var additionalTemplate in additionalTemplates)
                 {
                     Console.WriteLine($"[{mapping.Name}] Processing Template {additionalTemplate.Key}");
-                    var directory = Path.GetDirectoryName(inputArgs.MappingFile);
+                    var directory = Path.GetDirectoryName(Singleton.Instance.InputArgs.MappingFile);
                     if (!Directory.Exists(Path.Combine(directory, mapping.Name)))
                     {
                         Directory.CreateDirectory(Path.Combine(directory, mapping.Name));
