@@ -6,6 +6,7 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 using Jil;
+using Microsoft.AspNetCore.Razor.CodeGenerators;
 using PowerArgs;
 using RazorEngine.Configuration;
 using RazorEngine.Templating;
@@ -13,49 +14,31 @@ using Utilities.DataTypes.ExtensionMethods;
 
 namespace FakeCreator
 {
-    public class InputArgs
+    public sealed class Singleton
     {
-        [ArgRequired]
-        [ArgPosition(0)]
-        public string Dll { get; set; }
-        [ArgRequired]
-        [ArgPosition(1)]
+        private static readonly Lazy<Singleton> lazy = new Lazy<Singleton>(() => new Singleton());
+        public static Singleton Instance => lazy.Value;
 
-        public string RawTypes { get; set; }
-        public bool ExtrapolateTypes { get; set; }
+        private Singleton()
+        {
+            OutputGenerators = new List<IOutputGenerator>();
+        }
 
-        [ArgRequired]
-        [ArgDescription("Generates a new mapping file, then runs mapping. If false, then uses existing mapping file.")]
-        public bool GenerateMappingFile { get; set; }
-
-        public List<string> Types { get; set; }
-
-        [ArgDescription("Transformation, usage: \"Id>UniqueId;AnotherParameter>Transform;Third>Fourth\" ")]
-        public string Transformation { get; set; }
-
-        public string ClassPrefix { get; set; }
-
-        public string ClassPostfix { get; set; }
-
-        [ArgDescription("Usage: LookupItem<{0}>(remote.{1}) will turn into MongoRef<string>(remote.Id) for a string")]
-        public string IsAReferenceTypeFormat { get; set; }
-
-        [ArgDescription("Reference Lookup")]
-        public string IsAReferenceTypeLookupKey { get; set; }
-        [ArgDescription("The actual type for a reference")]
-        public string IsAReferenceTypeKey { get; set; }
-
-        [ArgRequired]
-        public string MappingFile { get; set; }
-
-        public string TemplateDirectory { get; set; }
-        
+        public InputArgs InputArgs { get; set; }
+        public List<Mapping> MappingList { get; set; }
+        public List<Assembly> Assemblies { get; set; }
+        public List<IOutputGenerator> OutputGenerators { get; set; }
     }
-   
+
+
+    public interface IOutputGenerator
+    {
+        string GetFileExtension(Mapping mapping);
+        string Generate(Mapping mapping);
+    }
+
     class Program
     {
-        private static InputArgs inputArgs;
-        private static List<Assembly> assemblies;
         static void Main(string[] args)
         {
             
@@ -65,14 +48,16 @@ namespace FakeCreator
                 
                 string[] FileToLoad = parsed.Dll.Split(new char[] { ',', ';' });
                 parsed.Types = parsed.RawTypes.Split(new char[] {',',';'}).ToList();
-                inputArgs = parsed;
+                Singleton.Instance.InputArgs = parsed;
 
-                assemblies = new List<Assembly>();
+                Singleton.Instance.Assemblies = new List<Assembly>();
 
                 FileToLoad.ForEach(r =>
                 {
-                    assemblies.Add(Assembly.LoadFrom(r));
+                    Singleton.Instance.Assemblies.Add(Assembly.LoadFrom(r));
                 });
+
+                SetupOutputGenerators();
 
                 if (parsed.GenerateMappingFile)
                 {
@@ -90,37 +75,64 @@ namespace FakeCreator
                 Console.WriteLine(ArgUsage.GenerateUsageFromTemplate<InputArgs>());
             }
         }
+
+        private static void SetupOutputGenerators()
+        {
+            
+            var enumerable = typeof(Program).Assembly.GetTypes().Where(r => !r.IsInterface && typeof(IOutputGenerator).IsAssignableFrom(r));
+            foreach (var type in enumerable)
+            {
+                Console.WriteLine(type.FullName);
+                var outputGenerator = Activator.CreateInstance(type) as IOutputGenerator;
+                if (outputGenerator != null)
+                {
+                    Singleton.Instance.OutputGenerators.Add(outputGenerator);
+                }
+            }
+        }
+
         private static List<Mapping> MappingList;
         private static void GenerateClasses()
         {
             Dictionary<string, string> additionalTemplates = new Dictionary<string, string>();
-            if (!String.IsNullOrWhiteSpace(inputArgs.TemplateDirectory) && Directory.Exists(inputArgs.TemplateDirectory))
+            if (!String.IsNullOrWhiteSpace(Singleton.Instance.InputArgs.TemplateDirectory) && Directory.Exists(Singleton.Instance.InputArgs.TemplateDirectory))
             {
-                foreach (var file in Directory.GetFiles(inputArgs.TemplateDirectory))
+                foreach (var file in Directory.GetFiles(Singleton.Instance.InputArgs.TemplateDirectory))
                 {
 
                     additionalTemplates.Add(Path.GetFileName(file), File.ReadAllText(file));
                 }
             }
 
-            MappingList = JSON.Deserialize<List<Mapping>>(File.ReadAllText(inputArgs.MappingFile));
+            MappingList = JSON.Deserialize<List<Mapping>>(File.ReadAllText(Singleton.Instance.InputArgs.MappingFile));
             
-            StringBuilder classFile = new StringBuilder();
-            StringBuilder fromRemote = new StringBuilder();
-            StringBuilder forRemote = new StringBuilder();
-            StringBuilder typescriptFile = new StringBuilder();
-            StringBuilder typescriptFromRemote = new StringBuilder();
+            //StringBuilder classFile = new StringBuilder();
+            //StringBuilder fromRemote = new StringBuilder();
+            //StringBuilder forRemote = new StringBuilder();
+            //StringBuilder typescriptFile = new StringBuilder();
+            //StringBuilder typescriptFromRemote = new StringBuilder();
 
             foreach (var mapping in MappingList)
             {
-                if (mapping.IsEnum)
+                foreach (var instanceOutputGenerator in Singleton.Instance.OutputGenerators)
                 {
-                    classFile.AppendLine(OutputObjectForEnum(mapping));
+                    string fileExtension = instanceOutputGenerator.GetFileExtension(mapping);
+                    var outp = instanceOutputGenerator.Generate(mapping);
+                    var path = Path.GetDirectoryName(Singleton.Instance.InputArgs.MappingFile) + "\\" + instanceOutputGenerator.GetType().Name + "\\";
+                    if (!Directory.Exists(path))
+                    {
+                        Directory.CreateDirectory(path);
+                    }
+                    File.WriteAllText(path + mapping.Name + fileExtension, outp );
                 }
-                else
-                {
-                    classFile.AppendLine(OutputObjectForClass(mapping));
-                }
+                //if (mapping.IsEnum)
+                //{
+                //    classFile.AppendLine(OutputObjectForEnum(mapping));
+                //}
+                //else
+                //{
+                //    classFile.AppendLine(OutputObjectForClass(mapping));
+                //}
 
                 foreach (var additionalTemplate in additionalTemplates)
                 {
@@ -132,20 +144,20 @@ namespace FakeCreator
                     }
                     File.WriteAllText(Path.Combine(directory, mapping.Name, string.Format(additionalTemplate.Key, mapping.Name )).Replace(".cshtml","") , PerformRazor(additionalTemplate.Key,additionalTemplate.Value, mapping) );
                 }
-                        
 
-                fromRemote.AppendLine(OutputFromSource(mapping));
-                forRemote.AppendLine(OutputForToSource(mapping));
-                typescriptFile.AppendLine(GenerateTypeScriptFile(mapping));
-                typescriptFromRemote.AppendLine(GenerateTypeScriptFromRemoteFile(mapping));
+
+                //fromRemote.AppendLine(OutputFromSource(mapping));
+                //forRemote.AppendLine(OutputForToSource(mapping));
+                //typescriptFile.AppendLine(GenerateTypeScriptFile(mapping));
+                //typescriptFromRemote.AppendLine(GenerateTypeScriptFromRemoteFile(mapping));
             }
 
-            File.WriteAllText(inputArgs.MappingFile + ".classses.cs", classFile.ToString());
-            File.WriteAllText(inputArgs.MappingFile + ".FromSource.cs", fromRemote.ToString());
-            File.WriteAllText(inputArgs.MappingFile + ".ToSource.cs", forRemote.ToString());
-            File.WriteAllText(inputArgs.MappingFile + ".classes.ts", typescriptFile.ToString());
-            File.WriteAllText(inputArgs.MappingFile + ".FromSource.ts", typescriptFromRemote.ToString());
-            File.WriteAllText(inputArgs.MappingFile + ".run.bat", "\"" + Assembly.GetExecutingAssembly().Location + "\" " + string.Join(" ",  GetCommandargs() ));
+            //File.WriteAllText(Singleton.Instance.InputArgs.MappingFile + ".classses.cs", classFile.ToString());
+            //File.WriteAllText(Singleton.Instance.InputArgs.MappingFile + ".FromSource.cs", fromRemote.ToString());
+            //File.WriteAllText(Singleton.Instance.InputArgs.MappingFile + ".ToSource.cs", forRemote.ToString());
+            //File.WriteAllText(Singleton.Instance.InputArgs.MappingFile + ".classes.ts", typescriptFile.ToString());
+            //File.WriteAllText(Singleton.Instance.InputArgs.MappingFile + ".FromSource.ts", typescriptFromRemote.ToString());
+            File.WriteAllText(Singleton.Instance.InputArgs.MappingFile + ".run.bat", "\"" + Assembly.GetExecutingAssembly().Location + "\" " + string.Join(" ",  GetCommandargs() ));
         }
 
         private static string[] GetCommandargs()
@@ -172,321 +184,201 @@ namespace FakeCreator
             return result;
         }
 
-        private static string GenerateTypeScriptFromRemoteFile(Mapping mapping)
-        {
-            if (mapping.IsEnum)
-            {
-                return null;
-            }
-            StringBuilder builder = new StringBuilder();
-            Type type = FetchType(mapping);
+        //private static string GenerateTypeScriptFromRemoteFile(Mapping mapping)
+        //{
+        //    if (mapping.IsEnum)
+        //    {
+        //        return null;
+        //    }
+        //    StringBuilder builder = new StringBuilder();
+        //    Type type = FetchType(mapping);
 
 
-            builder.AppendLine($"function to{inputArgs.ClassPrefix ?? ""}{type.Name}{inputArgs.ClassPostfix ?? ""} (r:any): {inputArgs.ClassPrefix ?? ""}{type.Name}{inputArgs.ClassPostfix ?? ""} {{");
-            builder.AppendLine($"let item = <{inputArgs.ClassPrefix ?? ""}{type.Name}{inputArgs.ClassPostfix ?? ""}>({{");
+        //    builder.AppendLine($"function to{Singleton.Instance.InputArgs.ClassPrefix ?? ""}{type.Name}{Singleton.Instance.InputArgs.ClassPostfix ?? ""} (r:any): {Singleton.Instance.InputArgs.ClassPrefix ?? ""}{type.Name}{Singleton.Instance.InputArgs.ClassPostfix ?? ""} {{");
+        //    builder.AppendLine($"let item = <{Singleton.Instance.InputArgs.ClassPrefix ?? ""}{type.Name}{Singleton.Instance.InputArgs.ClassPostfix ?? ""}>({{");
 
-            foreach (var propertyMapping in mapping.Mappings)
-            {
-                string propertyName = String.IsNullOrWhiteSpace(propertyMapping.TransformName) ? propertyMapping.Name : propertyMapping.TransformName;
-                string propertyType = inputArgs.ClassPrefix + propertyMapping.Type + inputArgs.ClassPostfix;
-                builder.AppendLine($"\t{propertyName}: r.{propertyType},");
-            }
-            builder.AppendLine("});");
-            builder.AppendLine("return item;");
-            builder.AppendLine("}");
-            return builder.ToString();
-        }
+        //    foreach (var propertyMapping in mapping.Mappings)
+        //    {
+        //        string propertyName = String.IsNullOrWhiteSpace(propertyMapping.TransformName) ? propertyMapping.Name : propertyMapping.TransformName;
+        //        string propertyType = Singleton.Instance.InputArgs.ClassPrefix + propertyMapping.Type + Singleton.Instance.InputArgs.ClassPostfix;
+        //        builder.AppendLine($"\t{propertyName}: r.{propertyType},");
+        //    }
+        //    builder.AppendLine("});");
+        //    builder.AppendLine("return item;");
+        //    builder.AppendLine("}");
+        //    return builder.ToString();
+        //}
 
-        private static string GenerateTypeScriptFile(Mapping mapping)
-        {
-            if (mapping.IsEnum)
-            {
-                return null;
-            }
-            StringBuilder builder = new StringBuilder();
-            Type type = FetchType(mapping);
+        //private static string GenerateTypeScriptFile(Mapping mapping)
+        //{
+        //    if (mapping.IsEnum)
+        //    {
+        //        return null;
+        //    }
+        //    StringBuilder builder = new StringBuilder();
+        //    Type type = FetchType(mapping);
 
 
 
-            Dictionary<string, string> TSPropertyTypeMapping = new Dictionary<string, string>
-            {
-                {"Int32","number" },
-                {"DateTime","Date" },
-            };
+        //    Dictionary<string, string> TSPropertyTypeMapping = new Dictionary<string, string>
+        //    {
+        //        {"Int32","number" },
+        //        {"DateTime","Date" },
+        //    };
 
-            builder.AppendLine($"export interface {inputArgs.ClassPrefix ?? ""}{type.Name}{inputArgs.ClassPostfix ?? ""} {{");
+        //    builder.AppendLine($"export interface {Singleton.Instance.InputArgs.ClassPrefix ?? ""}{type.Name}{Singleton.Instance.InputArgs.ClassPostfix ?? ""} {{");
             
-            foreach (var propertyMapping in mapping.Mappings)
-            {
-                string localPropertyType = propertyMapping.Type.IsASimpleType() ? propertyMapping.Type : inputArgs.ClassPrefix + propertyMapping.Type + inputArgs.ClassPostfix;
-                string propertyName = String.IsNullOrWhiteSpace(propertyMapping.TransformName) ? propertyMapping.Name : propertyMapping.TransformName;
-                string propertyType = inputArgs.ClassPrefix + propertyMapping.Type + inputArgs.ClassPostfix;
+        //    foreach (var propertyMapping in mapping.Mappings)
+        //    {
+        //        string localPropertyType = propertyMapping.Type.IsASimpleType() ? propertyMapping.Type : Singleton.Instance.InputArgs.ClassPrefix + propertyMapping.Type + Singleton.Instance.InputArgs.ClassPostfix;
+        //        string propertyName = String.IsNullOrWhiteSpace(propertyMapping.TransformName) ? propertyMapping.Name : propertyMapping.TransformName;
+        //        string propertyType = Singleton.Instance.InputArgs.ClassPrefix + propertyMapping.Type + Singleton.Instance.InputArgs.ClassPostfix;
 
-                if (TSPropertyTypeMapping.ContainsKey(localPropertyType))
-                {
-                    builder.AppendLine($"\t{propertyName}: {TSPropertyTypeMapping[localPropertyType]};");
-                }
-                else
-                {
-                    builder.AppendLine($"\t{propertyName}: {localPropertyType.ToLower()};");
-                }
+        //        if (TSPropertyTypeMapping.ContainsKey(localPropertyType))
+        //        {
+        //            builder.AppendLine($"\t{propertyName}: {TSPropertyTypeMapping[localPropertyType]};");
+        //        }
+        //        else
+        //        {
+        //            builder.AppendLine($"\t{propertyName}: {localPropertyType.ToLower()};");
+        //        }
                 
-            }
+        //    }
 
-            builder.AppendLine("}");
-            return builder.ToString();
+        //    builder.AppendLine("}");
+        //    return builder.ToString();
 
-        }
+        //}
 
-        private static string OutputForToSource(Mapping mapping)
-        {
-            if (mapping.IsEnum)
-            {
-                return null;
-            }
+        //private static string OutputForToSource(Mapping mapping)
+        //{
+        //    if (mapping.IsEnum)
+        //    {
+        //        return null;
+        //    }
 
-            StringBuilder builder = new StringBuilder();
-            Type type = FetchType(mapping);
-            string outputTypeName = mapping.Name;
-            string inputTypeName = $"{inputArgs.ClassPrefix ?? ""}{type.Name}{inputArgs.ClassPostfix ?? ""}";
-            string methodName = GetRemotePopulatorDTOMethodName(outputTypeName);
+        //    StringBuilder builder = new StringBuilder();
+        //    Type type = FetchType(mapping);
+        //    string outputTypeName = mapping.Name;
+        //    string inputTypeName = $"{Singleton.Instance.InputArgs.ClassPrefix ?? ""}{type.Name}{Singleton.Instance.InputArgs.ClassPostfix ?? ""}";
+        //    string methodName = GetRemotePopulatorDTOMethodName(outputTypeName);
 
-            builder.AppendLine($"public static {outputTypeName} {methodName} ({inputTypeName} remote, {outputTypeName} local = null) {{");
-            builder.AppendLine($"\tif (local == null) {{local = new {outputTypeName}();}}");
+        //    builder.AppendLine($"public static {outputTypeName} {methodName} ({inputTypeName} remote, {outputTypeName} local = null) {{");
+        //    builder.AppendLine($"\tif (local == null) {{local = new {outputTypeName}();}}");
 
-            foreach (var propertyMapping in mapping.Mappings)
-            {
-                string localPropertyName = String.IsNullOrWhiteSpace(propertyMapping.TransformName) ? propertyMapping.Name : propertyMapping.TransformName;
-                string remotePropertyName = propertyMapping.Name;
+        //    foreach (var propertyMapping in mapping.Mappings)
+        //    {
+        //        string localPropertyName = String.IsNullOrWhiteSpace(propertyMapping.TransformName) ? propertyMapping.Name : propertyMapping.TransformName;
+        //        string remotePropertyName = propertyMapping.Name;
 
-                string localPropertyType = propertyMapping.Type.IsASimpleType() ? propertyMapping.Type : inputArgs.ClassPrefix + propertyMapping.Type + inputArgs.ClassPostfix;
-                string remotePropertyType = propertyMapping.Type;
+        //        string localPropertyType = propertyMapping.Type.IsASimpleType() ? propertyMapping.Type : Singleton.Instance.InputArgs.ClassPrefix + propertyMapping.Type + Singleton.Instance.InputArgs.ClassPostfix;
+        //        string remotePropertyType = propertyMapping.Type;
 
-                if (type.GetProperty(remotePropertyName).SetMethod == null)
-                {
-                    continue;
-                }
+        //        if (type.GetProperty(remotePropertyName).SetMethod == null)
+        //        {
+        //            continue;
+        //        }
                 
-                if (propertyMapping.IsEnum || type.IsNullableEnum())
-                {
-                    Type enumType = Helpers.GetUnderlyingType(type);
+        //        if (propertyMapping.IsEnum || type.IsNullableEnum())
+        //        {
+        //            Type enumType = Helpers.GetUnderlyingType(type);
 
-                    if (propertyMapping.Type.IsASimpleType())
-                    {
-                        builder.AppendLine($"\tif (remote.{remotePropertyName} != null) {{ local.{localPropertyName} = remote.{remotePropertyName}; }}");
-                    }
-                    else if (propertyMapping.IsNullable)
-                    {
-                        builder.AppendLine($"\tif (remote.{remotePropertyName} != null) {{ local.{localPropertyName} = ({remotePropertyType}) Enum.Parse(typeof({remotePropertyType}), remote.{remotePropertyName}.ToString() ); }}");
-                    }
-                    else
-                    {
-                        builder.AppendLine($"\tlocal.{localPropertyName} = ({remotePropertyType}) Enum.Parse(typeof({remotePropertyType}), remote.{remotePropertyName}.ToString() );");
-                    }
-                }
-                else if (propertyMapping.IsNullable)
-                {
-                    if (propertyMapping.Type.IsASimpleType())
-                    {
-                        builder.AppendLine($"\tif (remote.{remotePropertyName} != null) {{ local.{localPropertyName} = remote.{remotePropertyName}; }}");
-                    }
-                    else
-                    {
-                        builder.AppendLine($"\tif (remote.{remotePropertyName} != null) {{ local.{localPropertyName} = { GetRemotePopulatorDTOMethodName(remotePropertyType)} (remote.{remotePropertyName}); }}");
-                    }
+        //            if (propertyMapping.Type.IsASimpleType())
+        //            {
+        //                builder.AppendLine($"\tif (remote.{remotePropertyName} != null) {{ local.{localPropertyName} = remote.{remotePropertyName}; }}");
+        //            }
+        //            else if (propertyMapping.IsNullable)
+        //            {
+        //                builder.AppendLine($"\tif (remote.{remotePropertyName} != null) {{ local.{localPropertyName} = ({remotePropertyType}) Enum.Parse(typeof({remotePropertyType}), remote.{remotePropertyName}.ToString() ); }}");
+        //            }
+        //            else
+        //            {
+        //                builder.AppendLine($"\tlocal.{localPropertyName} = ({remotePropertyType}) Enum.Parse(typeof({remotePropertyType}), remote.{remotePropertyName}.ToString() );");
+        //            }
+        //        }
+        //        else if (propertyMapping.IsNullable)
+        //        {
+        //            if (propertyMapping.Type.IsASimpleType())
+        //            {
+        //                builder.AppendLine($"\tif (remote.{remotePropertyName} != null) {{ local.{localPropertyName} = remote.{remotePropertyName}; }}");
+        //            }
+        //            else
+        //            {
+        //                builder.AppendLine($"\tif (remote.{remotePropertyName} != null) {{ local.{localPropertyName} = { GetRemotePopulatorDTOMethodName(remotePropertyType)} (remote.{remotePropertyName}); }}");
+        //            }
 
-                }
-                else if (propertyMapping.IsList)
-                {
+        //        }
+        //        else if (propertyMapping.IsList)
+        //        {
 
-                    if (propertyMapping.Type.IsASimpleType())
-                    {
-                        builder.AppendLine($"\tif (remote.{remotePropertyName} != null && remote.{remotePropertyName}.Any()) {{ local.{localPropertyName} = remote.{remotePropertyName}.Select(r=> r ).ToList();  }} ");
-                    }
-                    else
-                    {
-                        var internalMapping = MappingList.FirstOrDefault(r => r.Name == propertyMapping.Type);
+        //            if (propertyMapping.Type.IsASimpleType())
+        //            {
+        //                builder.AppendLine($"\tif (remote.{remotePropertyName} != null && remote.{remotePropertyName}.Any()) {{ local.{localPropertyName} = remote.{remotePropertyName}.Select(r=> r ).ToList();  }} ");
+        //            }
+        //            else
+        //            {
+        //                var internalMapping = MappingList.FirstOrDefault(r => r.Name == propertyMapping.Type);
 
-                        if (internalMapping != null && internalMapping.IsAReference)
-                        {
-                            builder.AppendLine($"\tif (remote.{remotePropertyName} != null && remote.{remotePropertyName}.Any()) {{ local.{localPropertyName} = remote.{remotePropertyName}.Select(r=> {string.Format(inputArgs.IsAReferenceTypeFormat, localPropertyType, inputArgs.IsAReferenceTypeLookupKey)} ).ToList();  }} ");
-                        }
-                        else
-                        {
-                            builder.AppendLine($"\t if (remote.{remotePropertyName} != null && remote.{remotePropertyName}.Any()) {{ local.{localPropertyName} = remote.{remotePropertyName}.Select(r=> {GetRemotePopulatorDTOMethodName(remotePropertyType)}(r) ).ToList();  }} ");
-                        }
-                    }
-                }
-                else
-                {
-                    if (propertyMapping.Type.IsASimpleType())
-                    {
-                        if (propertyMapping.IsNullable)
-                        {
-                            builder.AppendLine($"\tif (remote.{remotePropertyName} != null) {{ local.{localPropertyName} = remote.{remotePropertyName}; }}");
-                        }
-                        else
-                        {
-                            builder.AppendLine($"\tlocal.{localPropertyName} = remote.{remotePropertyName};");
-                        }
+        //                if (internalMapping != null && internalMapping.IsAReference)
+        //                {
+        //                    builder.AppendLine($"\tif (remote.{remotePropertyName} != null && remote.{remotePropertyName}.Any()) {{ local.{localPropertyName} = remote.{remotePropertyName}.Select(r=> {string.Format(Singleton.Instance.InputArgs.IsAReferenceTypeFormat, localPropertyType, Singleton.Instance.InputArgs.IsAReferenceTypeLookupKey)} ).ToList();  }} ");
+        //                }
+        //                else
+        //                {
+        //                    builder.AppendLine($"\t if (remote.{remotePropertyName} != null && remote.{remotePropertyName}.Any()) {{ local.{localPropertyName} = remote.{remotePropertyName}.Select(r=> {GetRemotePopulatorDTOMethodName(remotePropertyType)}(r) ).ToList();  }} ");
+        //                }
+        //            }
+        //        }
+        //        else
+        //        {
+        //            if (propertyMapping.Type.IsASimpleType())
+        //            {
+        //                if (propertyMapping.IsNullable)
+        //                {
+        //                    builder.AppendLine($"\tif (remote.{remotePropertyName} != null) {{ local.{localPropertyName} = remote.{remotePropertyName}; }}");
+        //                }
+        //                else
+        //                {
+        //                    builder.AppendLine($"\tlocal.{localPropertyName} = remote.{remotePropertyName};");
+        //                }
                         
-                    }
-                    else
-                    {
-                        var internalMapping = MappingList.FirstOrDefault(r => r.Name == propertyMapping.Type);
+        //            }
+        //            else
+        //            {
+        //                var internalMapping = MappingList.FirstOrDefault(r => r.Name == propertyMapping.Type);
 
-                        if (internalMapping != null && internalMapping.IsAReference)
-                        {
-                            builder.AppendLine($"\tif (remote.{remotePropertyName} != null) {{ local.{localPropertyName} = {string.Format(inputArgs.IsAReferenceTypeFormat, localPropertyType, inputArgs.IsAReferenceTypeLookupKey)};  }}");
-                        }
-                        else
-                        {
-                            builder.AppendLine($"\tif (remote.{remotePropertyName} != null) {{ local.{localPropertyName} = {GetRemotePopulatorDTOMethodName(localPropertyType)} (remote.{remotePropertyName}); }}");
-                        }
-                    }
-                }
+        //                if (internalMapping != null && internalMapping.IsAReference)
+        //                {
+        //                    builder.AppendLine($"\tif (remote.{remotePropertyName} != null) {{ local.{localPropertyName} = {string.Format(Singleton.Instance.InputArgs.IsAReferenceTypeFormat, localPropertyType, Singleton.Instance.InputArgs.IsAReferenceTypeLookupKey)};  }}");
+        //                }
+        //                else
+        //                {
+        //                    builder.AppendLine($"\tif (remote.{remotePropertyName} != null) {{ local.{localPropertyName} = {GetRemotePopulatorDTOMethodName(localPropertyType)} (remote.{remotePropertyName}); }}");
+        //                }
+        //            }
+        //        }
 
-            }
+        //    }
 
-            builder.AppendLine("\treturn local;");
+        //    builder.AppendLine("\treturn local;");
 
-            builder.AppendLine("}");
-            return builder.ToString();
-        }
+        //    builder.AppendLine("}");
+        //    return builder.ToString();
+        //}
 
-        private static string OutputFromSource(Mapping mapping)
-        {
-            if (mapping.IsEnum)
-            {
-                return null;
-            }
-
-            StringBuilder builder = new StringBuilder();
-            Type type = FetchType(mapping);
-            string inputTypeName = mapping.Name;
-            string outputTypeName = $"{inputArgs.ClassPrefix ?? ""}{type.Name}{inputArgs.ClassPostfix ?? ""}";
-            string methodName = GetRemotePopulatorMethodName(outputTypeName);
-
-            builder.AppendLine($"public static {outputTypeName} {methodName} ({inputTypeName} remote, {outputTypeName} local = null) {{");
-
-            if (!mapping.IsEnum)
-            {
-                builder.AppendLine($"if (local == null) {{local = new {outputTypeName}();}}");
-                foreach (var propertyMapping in mapping.Mappings)
-                {
-                    string localPropertyName = String.IsNullOrWhiteSpace(propertyMapping.TransformName)
-                        ? propertyMapping.Name
-                        : propertyMapping.TransformName;
-                    string remotePropertyName = propertyMapping.Name;
-
-                    string localPropertyType = propertyMapping.Type.IsASimpleType()
-                        ? propertyMapping.Type
-                        : inputArgs.ClassPrefix + propertyMapping.Type + inputArgs.ClassPostfix;
-                    string remotePropertyType = propertyMapping.Type;
-
-                    if (propertyMapping.IsEnum || type.IsNullableEnum())
-                    {
-                        Type enumType = Helpers.GetUnderlyingType(type);
-
-                        if (propertyMapping.Type.IsASimpleType())
-                        {
-                            builder.AppendLine(
-                                $"\tif (remote.{remotePropertyName} != null) {{ local.{localPropertyName} = remote.{remotePropertyName}; }}");
-                        }
-                        else if (propertyMapping.IsNullable)
-                        {
-                            builder.AppendLine(
-                                $"\tif (remote.{remotePropertyName} != null) {{ local.{localPropertyName} = ({localPropertyType}) Enum.Parse(typeof({localPropertyType}), remote.{remotePropertyName}.ToString() ); }}");
-                        }
-                        else
-                        {
-                            builder.AppendLine(
-                                $"\tlocal.{localPropertyName} = ({localPropertyType}) Enum.Parse(typeof({localPropertyType}), remote.{remotePropertyName}.ToString() );");
-                        }
-                    }
-                    else if (propertyMapping.IsNullable)
-                    {
-                        if (propertyMapping.Type.IsASimpleType())
-                        {
-                            builder.AppendLine(
-                                $"\tif (remote.{remotePropertyName} != null) {{ local.{localPropertyName} = remote.{remotePropertyName}; }}");
-                        }
-                        else
-                        {
-                            builder.AppendLine(
-                                $"\tif (remote.{remotePropertyName} != null) {{ local.{localPropertyName} = {GetRemotePopulatorMethodName(localPropertyType)} (remote.{remotePropertyName}); }}");
-                        }
-                    }
-                    else if (propertyMapping.IsList)
-                    {
-                        if (propertyMapping.Type.IsASimpleType())
-                        {
-                            builder.AppendLine(
-                                $"\tif (remote.{remotePropertyName} != null && remote.{remotePropertyName}.Any()) {{ local.{localPropertyName} = remote.{remotePropertyName}.Select(r=> r ).ToList();  }} ");
-                        }
-                        else
-                        {
-                            var internalMapping = MappingList.FirstOrDefault(r => r.Name == propertyMapping.Type);
-
-                            if (internalMapping != null && internalMapping.IsAReference)
-                            {
-                                builder.AppendLine(
-                                    $"\tif (remote.{remotePropertyName} != null && remote.{remotePropertyName}.Any()) {{ local.{localPropertyName} = remote.{remotePropertyName}.Select(r=> {string.Format(inputArgs.IsAReferenceTypeFormat, localPropertyType, inputArgs.IsAReferenceTypeLookupKey)} ).ToList();  }} ");
-                            }
-                            else
-                            {
-                                builder.AppendLine(
-                                    $"\t if (remote.{remotePropertyName} != null && remote.{remotePropertyName}.Any()) {{ local.{localPropertyName} = remote.{remotePropertyName}.Select(r=> {GetRemotePopulatorMethodName(localPropertyType)}(r) ).ToList();  }} ");
-                            }
-                        }
-                    }
-                    else
-                    {
-                        if (propertyMapping.Type.IsASimpleType())
-                        {
-                            if (propertyMapping.IsNullable)
-                            {
-                                builder.AppendLine(
-                                    $"\tif (remote.{remotePropertyName} != null) {{ local.{localPropertyName} = remote.{remotePropertyName}; }}");
-                            }
-                            else
-                            {
-                                builder.AppendLine($"\tlocal.{localPropertyName} = remote.{remotePropertyName};");
-                            }
-                        }
-                        else
-                        {
-                            var internalMapping = MappingList.FirstOrDefault(r => r.Name == propertyMapping.Type);
-
-                            if (internalMapping != null && internalMapping.IsAReference)
-                            {
-                                builder.AppendLine(
-                                    $"\tif (remote.{remotePropertyName} != null) {{ local.{localPropertyName} = {string.Format(inputArgs.IsAReferenceTypeFormat, localPropertyType, inputArgs.IsAReferenceTypeLookupKey)};  }}");
-                            }
-                            else
-                            {
-                                builder.AppendLine(
-                                    $"\tif (remote.{remotePropertyName} != null) {{ local.{localPropertyName} = {GetRemotePopulatorMethodName(localPropertyType)} (remote.{remotePropertyName}); }}");
-                            }
-                        }
-                    }
-                }
-
-                builder.AppendLine("\treturn local;");
-            }
-
-
-            builder.AppendLine("}");
-            return builder.ToString();
-        }
+        //private static string OutputFromSource(Mapping mapping)
+        //{
+            
+        //}
 
         private static string GetRemotePopulatorDTOMethodName(string outputTypeName)
         {
             return "Populate" + outputTypeName + "ToSource";
-        }private static string GetRemotePopulatorMethodName(string outputTypeName)
-        {
-            return "Populate" + outputTypeName + "FromSource";
         }
+        //private static string GetRemotePopulatorMethodName(string outputTypeName)
+        //{
+        //    return "Populate" + outputTypeName + "FromSource";
+        //}
 
         private static string OutputObjectForClass(Mapping mapping)
         {
@@ -498,7 +390,7 @@ namespace FakeCreator
             {
                 builder.AppendLine("// I am a reference");
             }
-            builder.AppendLine($"public class {inputArgs.ClassPrefix??""}{type.Name}{inputArgs.ClassPostfix??""} {{");
+            builder.AppendLine($"public class {Singleton.Instance.InputArgs.ClassPrefix??""}{type.Name}{Singleton.Instance.InputArgs.ClassPostfix??""} {{");
 
             foreach (var propertyMapping in mapping.Mappings)
             {
@@ -514,11 +406,11 @@ namespace FakeCreator
 
                     if (internalMapping != null && internalMapping.IsAReference)
                     {
-                        propertyType = String.Format(inputArgs.IsAReferenceTypeKey, inputArgs.ClassPrefix + propertyMapping.Type + inputArgs.ClassPostfix);
+                        propertyType = String.Format(Singleton.Instance.InputArgs.IsAReferenceTypeKey, Singleton.Instance.InputArgs.ClassPrefix + propertyMapping.Type + Singleton.Instance.InputArgs.ClassPostfix);
                     }
                     else
                     {
-                        propertyType = inputArgs.ClassPrefix + propertyMapping.Type + inputArgs.ClassPostfix;
+                        propertyType = Singleton.Instance.InputArgs.ClassPrefix + propertyMapping.Type + Singleton.Instance.InputArgs.ClassPostfix;
                     }
                     
                 }
@@ -557,7 +449,7 @@ namespace FakeCreator
         private static string OutputObjectForEnum(Mapping type)
         {
             var builder = new StringBuilder();
-            builder.AppendLine($"public enum {inputArgs.ClassPrefix ?? ""}{type.Name}{inputArgs.ClassPostfix ?? ""} {{");
+            builder.AppendLine($"public enum {Singleton.Instance.InputArgs.ClassPrefix ?? ""}{type.Name}{Singleton.Instance.InputArgs.ClassPostfix ?? ""} {{");
             foreach (var enumName in FetchType(type).GetEnumNames())
             {
                 builder.AppendLine(enumName + ",");
@@ -568,7 +460,7 @@ namespace FakeCreator
 
         private static void GenerateMapping()
         {
-            List<Type> mainTypes = assemblies.SelectMany(r=>r.GetTypes()).Where(r => inputArgs.Types.Contains(r.Name)).ToList();
+            List<Type> mainTypes = Singleton.Instance.Assemblies.SelectMany(r=>r.GetTypes()).Where(r => Singleton.Instance.InputArgs.Types.Contains(r.Name)).ToList();
 
 
             List<Type> KnownTypes = new List<Type>() {mainTypes};
@@ -625,7 +517,7 @@ namespace FakeCreator
 
             List<Mapping> mappings = new List<Mapping>();
 
-            Dictionary<string, string> transformation = string.IsNullOrWhiteSpace(inputArgs.Transformation) ? new Dictionary<string,string>() : inputArgs.Transformation.Split(';').ToDictionary(r => r.Split('>')[0], r => r.Split('>')[1]);
+            Dictionary<string, string> transformation = string.IsNullOrWhiteSpace(Singleton.Instance.InputArgs.Transformation) ? new Dictionary<string,string>() : Singleton.Instance.InputArgs.Transformation.Split(';').ToDictionary(r => r.Split('>')[0], r => r.Split('>')[1]);
 
             foreach (var knownType in KnownTypes)
             {
@@ -671,114 +563,8 @@ namespace FakeCreator
 
                 mappings.Add(mapping);
             }
-
-            File.WriteAllText(inputArgs.MappingFile, JSON.Serialize(mappings, Options.PrettyPrintExcludeNullsIncludeInherited));
-        }
-    }
-
-    [DebuggerDisplay("{FullName}")]
-    public class Mapping
-    {
-        public string Name { get; set; }
-        public string FullName { get; set; }
-        public string Assembly { get; set; }
-        public bool IsMainType { get; set; }
-        public bool IsEnum { get; set; }
-        public bool IsAReference { get; set; }
-
-        public override string ToString()
-        {
-            return $"{nameof(FullName)}: {FullName}";
-        }
-
-        public List<PropertyMapping> Mappings { get; set; }
-    }
-    [DebuggerDisplay("{Name}")]
-    public class PropertyMapping
-    {
-        public string Name { get; set; }
-        public string TransformName { get; set; }
-        public string Type { get; set; }
-
-        public bool IsGeneric { get; set; }
-        public bool IsEnum { get; set; }
-        public bool IsNullable { get; set; }
-        public bool IsList { get; set; }
-    }
-
-    public static class Helpers
-    {
-        public static bool IsTypeAGenericSimpleType(this Type typeToCheck)
-        {
-            return typeToCheck.IsGenericType && typeToCheck.GetGenericArguments().All(r=>r.IsTypeASimpleType());
-        }
-
-        public static bool IsASimpleType(this string value)
-        {
-            List<string> baseTypes = new List<string> {"Boolean",
-"Byte",
-"Char",
-"DateTime",
-"DateTimeOffset",
-"Decimal",
-"Double",
-"Int16",
-"Int32",
-"Int64",
-"SByte",
-"Single",
-"String",
-"UInt16",
-"UInt32",
-"UInt64"};
-
-            return baseTypes.Contains(value);
-        }
-
-
-        public static bool IsNullableEnum(this Type typeToCheck)
-        {
-            return typeToCheck.IsGenericType && typeToCheck.GetGenericTypeDefinition() == typeof(Nullable<>);
-        }
-
-        public static bool IsTypeASimpleType(this Type typeToCheck)
-        {
-            var typeCode = Type.GetTypeCode(GetUnderlyingType(typeToCheck));
-
-            switch (typeCode)
-            {
-                case TypeCode.Boolean:
-                case TypeCode.Byte:
-                case TypeCode.Char:
-                case TypeCode.DateTime:
-                case TypeCode.Decimal:
-                case TypeCode.Double:
-                case TypeCode.Int16:
-                case TypeCode.Int32:
-                case TypeCode.Int64:
-                case TypeCode.SByte:
-                case TypeCode.Single:
-                case TypeCode.String:
-                case TypeCode.UInt16:
-                case TypeCode.UInt32:
-                case TypeCode.UInt64:
-                    return true;
-                default:
-                    return false;
-            }
-        }
-
-        public static Type GetUnderlyingType(Type typeToCheck)
-        {
-            if (typeToCheck.IsGenericType &&
-                typeToCheck.GetGenericTypeDefinition() == typeof(Nullable<>))
-            {
-                return Nullable.GetUnderlyingType(typeToCheck);
-            }
-            else
-            {
-                return typeToCheck;
-            }
+            Singleton.Instance.MappingList = mappings;
+            File.WriteAllText(Singleton.Instance.InputArgs.MappingFile, JSON.Serialize(mappings, Options.PrettyPrintExcludeNullsIncludeInherited));
         }
     }
 }
