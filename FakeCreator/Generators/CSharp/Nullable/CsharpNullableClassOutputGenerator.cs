@@ -1,10 +1,8 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
 
-namespace FakeCreator.Generators.CSharp
+namespace FakeCreator.Generators.CSharp.Nullable
 {
     public class CsharpNullableClassOutputGenerator : IOutputGenerator
     {

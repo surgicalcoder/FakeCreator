@@ -76,10 +76,11 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Generators\CSharp\CsharpNullableClassOutputGenerator.cs" />
+    <Compile Include="Generators\CSharp\Nullable\CsharpNullableClassOutputGenerator.cs" />
     <Compile Include="Generators\CSharp\CsharpClassOutputGenerator.cs" />
     <Compile Include="Generators\CSharp\CsharpEnumOutputGenerator.cs" />
     <Compile Include="Generators\CSharp\FromSourceOutputGenerator.cs" />
+    <Compile Include="Generators\CSharp\Nullable\NullableToSourceOutputGenerator.cs" />
     <Compile Include="Helpers.cs" />
     <Compile Include="InputArgs.cs" />
     <Compile Include="IOutputGenerator.cs" />
