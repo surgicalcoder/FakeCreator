@@ -14,6 +14,11 @@ namespace FakeCreator
         public bool IsAReference { get; set; }
         public List<PropertyMapping> Mappings { get; set; }
 
+        public override string ToString()
+        {
+            return $"{nameof(Name)}: {Name}";
+        }
+
         public Type Fetch()
         {
             var assembly = AppDomain.CurrentDomain.GetAssemblies().FirstOrDefault(r => r.FullName == this.Assembly);

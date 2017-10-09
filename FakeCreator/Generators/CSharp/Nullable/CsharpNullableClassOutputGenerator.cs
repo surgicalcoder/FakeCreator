@@ -67,8 +67,13 @@ namespace FakeCreator.Generators.CSharp.Nullable
                 }
                 else
                 {
-                    
-                    if (type.GetProperty(propertyName).PropertyType.IsValueType)
+                    var propertyInfo = type.GetProperty(propertyName);
+                    if (propertyInfo == null)
+                    {
+                        continue;
+                    }
+
+                    if (propertyInfo.PropertyType.IsValueType)
                     {
                         builder.AppendLine($"\tpublic Nullable<{propertyType}> {propertyName} {{get; set;}}");
                     }

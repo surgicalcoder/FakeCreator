@@ -41,7 +41,7 @@ namespace FakeCreator.Generators.CSharp
                 string localPropertyType = propertyMapping.Type.IsASimpleType() ? propertyMapping.Type : Singleton.Instance.InputArgs.ClassPrefix + propertyMapping.Type + Singleton.Instance.InputArgs.ClassPostfix;
                 string remotePropertyType = propertyMapping.Type;
 
-                if (type.GetProperty(remotePropertyName).SetMethod == null)
+                if (type.GetProperty(remotePropertyName) != null && type.GetProperty(remotePropertyName).SetMethod == null)
                 {
                     continue;
                 }
