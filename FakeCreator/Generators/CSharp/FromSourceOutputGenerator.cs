@@ -83,12 +83,57 @@ namespace FakeCreator.Generators.CSharp
                                 $"\tif (remote.{remotePropertyName} != null) {{ local.{localPropertyName} = {GetRemotePopulatorMethodName(localPropertyType)} (remote.{remotePropertyName}); }}");
                         }
                     }
+                    else if (propertyMapping.IsDictionary)
+                    {
+                        var dictLine = $"\tif (remote.{remotePropertyName} != null && remote.{remotePropertyName}.Any()) {{";
+
+                        dictLine = dictLine + $"local.{localPropertyName} = remote.{remotePropertyName}.ToDictionary(";
+
+                        foreach (var dictionaryType in propertyMapping.DictionaryTypes)
+                        {
+                            int index = propertyMapping.DictionaryTypes.IndexOf(dictionaryType);
+
+                            if (dictionaryType.IsASimpleType())
+                            {
+
+                                dictLine = dictLine + $"pair=>";
+                                if (index == 0)
+                                {
+                                    dictLine = dictLine + $"pair.Key";
+                                }
+                                else
+                                {
+                                    dictLine = dictLine + $"pair.Value";
+                                }
+                            }
+                            else
+                            {
+                                dictLine = dictLine + $"pair=>";
+                                if (index == 0)
+                                {
+                                    dictLine = dictLine + $"{GetRemotePopulatorMethodName(dictionaryType)}(pair.Key)";
+                                }
+                                else
+                                {
+                                    dictLine = dictLine + $"{GetRemotePopulatorMethodName(dictionaryType)}(pair.Value)";
+                                }
+                            }
+                            dictLine = dictLine + $",";
+                        }
+                        if (dictLine.EndsWith(","))
+                        {
+                            dictLine = dictLine.Substring(0, dictLine.Length - 1);
+                        }
+
+                        dictLine = dictLine + " }";
+
+                        builder.AppendLine(dictLine);
+                    }
                     else if (propertyMapping.IsList)
                     {
                         if (propertyMapping.Type.IsASimpleType())
                         {
-                            builder.AppendLine(
-                                $"\tif (remote.{remotePropertyName} != null && remote.{remotePropertyName}.Any()) {{ local.{localPropertyName} = remote.{remotePropertyName}.Select(r=> r ).ToList();  }} ");
+                            builder.AppendLine($"\tif (remote.{remotePropertyName} != null && remote.{remotePropertyName}.Any()) {{ local.{localPropertyName} = remote.{remotePropertyName}.Select(r=> r ).ToList();  }} ");
                         }
                         else
                         {
