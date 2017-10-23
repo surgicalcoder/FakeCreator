@@ -59,9 +59,8 @@ namespace FakeCreator
             var enumerable = typeof(Program).Assembly.GetTypes().Where(r => !r.IsInterface && typeof(IOutputGenerator).IsAssignableFrom(r));
             foreach (var type in enumerable)
             {
-                Console.WriteLine(type.FullName);
-                var outputGenerator = Activator.CreateInstance(type) as IOutputGenerator;
-                if (outputGenerator != null)
+                Console.WriteLine($"Found Generator : {type.FullName}");
+                if (Activator.CreateInstance(type) is IOutputGenerator outputGenerator)
                 {
                     Singleton.Instance.OutputGenerators.Add(outputGenerator);
                 }
@@ -94,7 +93,7 @@ namespace FakeCreator
                         continue;
                     }
 
-                    var path = Path.GetDirectoryName(Singleton.Instance.InputArgs.MappingFile) + "\\" + mapping.Name + "\\";
+                    var path = Path.GetDirectoryName(Path.GetFullPath(Singleton.Instance.InputArgs.MappingFile)) + "\\" + mapping.Name + "\\";
                     if (!Directory.Exists(path))
                     {
                         Directory.CreateDirectory(path);
