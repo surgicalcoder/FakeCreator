@@ -66,6 +66,10 @@ namespace FakeCreator.Generators.CSharp
                 {
                     builder.AppendLine($"\tpublic List<{propertyType}> {propertyName} {{get; set;}}");
                 }
+                else if (propertyMapping.IsDictionary)
+                {
+                    builder.AppendLine($"\tpublic Dictionary<{propertyMapping.DictionaryTypes.FirstOrDefault()},{propertyMapping.DictionaryTypes.Skip(1).FirstOrDefault()}> {propertyName} {{get; set;}}");
+                }
                 else
                 {
                     builder.AppendLine($"\tpublic {propertyType} {propertyName} {{get; set;}}");

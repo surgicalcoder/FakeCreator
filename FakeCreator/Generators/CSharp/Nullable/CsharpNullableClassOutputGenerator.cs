@@ -65,6 +65,10 @@ namespace FakeCreator.Generators.CSharp.Nullable
                 {
                     builder.AppendLine($"\tpublic List<{propertyType}> {propertyName} {{get; set;}}");
                 }
+                else if (propertyMapping.IsDictionary)
+                {
+                    builder.AppendLine($"\tpublic Dictionary<{propertyMapping.DictionaryTypes.FirstOrDefault()},{propertyMapping.DictionaryTypes.Skip(1).FirstOrDefault()}> {propertyName} {{get; set;}}");
+                }
                 else
                 {
                     var propertyInfo = type.GetProperty(propertyName);

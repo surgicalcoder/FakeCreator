@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace FakeCreator
 {
     public class PropertyMapping
@@ -10,5 +12,9 @@ namespace FakeCreator
         public bool IsEnum { get; set; }
         public bool IsNullable { get; set; }
         public bool IsList { get; set; }
+
+        public bool IsDictionary { get; set; }
+
+        public List<string> DictionaryTypes { get; set; }
     }
 }

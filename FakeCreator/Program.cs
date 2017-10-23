@@ -164,15 +164,17 @@ namespace FakeCreator
                         {
                             if (propertyInfo.PropertyType.IsGenericType)
                             {
-                                var genParam = propertyInfo.PropertyType.GenericTypeArguments.FirstOrDefault();
-                                if (KnownTypes.Contains(genParam))
+                                foreach (var argument in propertyInfo.PropertyType.GenericTypeArguments)
                                 {
-                                    continue;
-                                }
-                                else
-                                {
-                                    KnownTypes.Add(genParam);
-                                    doINeedToContinue++;
+                                    if (KnownTypes.Contains(argument))
+                                    {
+                                        continue;
+                                    }
+                                    else
+                                    {
+                                        KnownTypes.Add(argument);
+                                        doINeedToContinue++;
+                                    }
                                 }
                             }
                             else
@@ -229,6 +231,17 @@ namespace FakeCreator
                             || info.PropertyType.GetGenericTypeDefinition() == typeof(IEnumerable<>) 
 
                         );
+
+                    pMap.IsDictionary = info.PropertyType.IsGenericType &&
+                    (
+                        info.PropertyType.GetGenericTypeDefinition() == typeof(Dictionary<,>)
+                        || info.PropertyType.GetGenericTypeDefinition() == typeof(IDictionary<,>)
+                    );
+
+                    if (pMap.IsDictionary)
+                    {
+                        pMap.DictionaryTypes = info.PropertyType.GenericTypeArguments.Select(r => r.Name).ToList();
+                    }
 
                     if (pMap.IsGeneric)
                     {
