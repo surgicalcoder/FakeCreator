@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 
 namespace FakeCreator.Generators.TypeScript
@@ -10,6 +11,12 @@ namespace FakeCreator.Generators.TypeScript
         {
             return ".ts";
         }
+
+        Dictionary<string, string> TSPropertyTypeMapping = new Dictionary<string, string>
+        {
+            {"Int32","number" },
+            {"DateTime","Date" },
+        };
 
         public string Generate(Mapping mapping)
         {
@@ -22,11 +29,7 @@ namespace FakeCreator.Generators.TypeScript
 
 
 
-            Dictionary<string, string> TSPropertyTypeMapping = new Dictionary<string, string>
-            {
-                {"Int32","number" },
-                {"DateTime","Date" },
-            };
+
 
             builder.AppendLine($"export interface {Singleton.Instance.InputArgs.ClassPrefix ?? ""}{type.Name}{Singleton.Instance.InputArgs.ClassPostfix ?? ""} {{");
 
@@ -36,19 +39,45 @@ namespace FakeCreator.Generators.TypeScript
                 string propertyName = String.IsNullOrWhiteSpace(propertyMapping.TransformName) ? propertyMapping.Name : propertyMapping.TransformName;
                 string propertyType = Singleton.Instance.InputArgs.ClassPrefix + propertyMapping.Type + Singleton.Instance.InputArgs.ClassPostfix;
 
-                if (TSPropertyTypeMapping.ContainsKey(localPropertyType))
+                if (propertyMapping.IsDictionary)
                 {
-                    builder.AppendLine($"\t{propertyName}: {TSPropertyTypeMapping[localPropertyType]};");
+
+                    builder.AppendLine($"\t[Key: {GetTSSafeType(propertyMapping.DictionaryTypes.FirstOrDefault())}]: {propertyMapping.DictionaryTypes.Skip(1).FirstOrDefault()};");
+
+                    if (TSPropertyTypeMapping.ContainsKey(localPropertyType))
+                    {
+                        
+                    }
+                    else
+                    {
+                        builder.AppendLine($"\t{propertyName}: {localPropertyType.ToLower()};");
+                    }
+                    // [Key: string]: T;
                 }
                 else
                 {
-                    builder.AppendLine($"\t{propertyName}: {localPropertyType.ToLower()};");
+                    if (TSPropertyTypeMapping.ContainsKey(localPropertyType))
+                    {
+                        builder.AppendLine($"\t{propertyName}: {TSPropertyTypeMapping[localPropertyType]};");
+                    }
+                    else
+                    {
+                        builder.AppendLine($"\t{propertyName}: {localPropertyType.ToLower()};");
+                    }
                 }
-
             }
 
             builder.AppendLine("}");
             return builder.ToString();
+        }
+
+        public string GetTSSafeType(string name)
+        {
+            if (TSPropertyTypeMapping.ContainsKey(name))
+            {
+                return TSPropertyTypeMapping[name];
+            }
+            return name;
         }
     }
 }

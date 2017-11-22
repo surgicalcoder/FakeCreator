@@ -114,6 +114,10 @@ namespace FakeCreator
             }
 
             File.WriteAllText(Singleton.Instance.InputArgs.MappingFile + ".run.bat", "\"" + Assembly.GetExecutingAssembly().Location + "\" " + string.Join(" ",  GetCommandargs() ));
+            foreach (var file in Directory.GetFiles(Path.GetTempPath(), "RazorEngine*.*"))
+            {
+                Directory.Delete(file);
+            }
         }
 
         private static string[] GetCommandargs()
@@ -127,15 +131,16 @@ namespace FakeCreator
                 return s;
             }).ToArray();
         }
+        private static TemplateServiceConfiguration config = new TemplateServiceConfiguration()
+        {
+            DisableTempFileLocking = true,
+             CachingProvider = new DefaultCachingProvider()
+        };
+
+        private static IRazorEngineService razorEngineService = RazorEngineService.Create(config);
 
         private static string PerformRazor(string file, string template, Mapping mapping)
         {
-            TemplateServiceConfiguration config = new TemplateServiceConfiguration();
-            config.DisableTempFileLocking = true;
-            config.CachingProvider = new DefaultCachingProvider(t=> {});
-
-            var razorEngineService = RazorEngineService.Create(config);
-            
             var result = razorEngineService.RunCompile(template, file, null,mapping);
             return result;
         }
@@ -154,6 +159,7 @@ namespace FakeCreator
                 List<Type> intKnownTypes = new List<Type> {KnownTypes};
                 foreach (var type in intKnownTypes)
                 {
+                    var typeName = type.Name;
                     foreach (var propertyInfo in type.GetProperties())
                     {
                         if ( (!propertyInfo.PropertyType.IsEnum && !propertyInfo.PropertyType.IsNullableEnum()) && ( propertyInfo.PropertyType.IsTypeASimpleType() || propertyInfo.PropertyType.IsTypeAGenericSimpleType()))
@@ -198,6 +204,8 @@ namespace FakeCreator
 
             KnownTypes.RemoveAll(r => r.Assembly == typeof(DateTime).Assembly);
 
+            var item1 = KnownTypes.Where(e => e.GetProperties().Length == 1).ToList();
+
             List<Mapping> mappings = new List<Mapping>();
 
             Dictionary<string, string> transformation = string.IsNullOrWhiteSpace(Singleton.Instance.InputArgs.Transformation) ? new Dictionary<string,string>() : Singleton.Instance.InputArgs.Transformation.Split(';').ToDictionary(r => r.Split('>')[0], r => r.Split('>')[1]);
@@ -215,13 +223,20 @@ namespace FakeCreator
                     PropertyMapping pMap = new PropertyMapping();
 
                     pMap.Name = info.Name;
+
                     if (transformation.ContainsKey(info.Name))
                     {
                         pMap.TransformName = transformation[info.Name];
                     }
+
                     pMap.IsGeneric = info.PropertyType.IsGenericType;
                     pMap.IsEnum = (info.PropertyType.IsEnum || info.PropertyType.IsNullableEnum());
                     pMap.IsNullable = info.PropertyType.IsGenericType && info.PropertyType.GetGenericTypeDefinition() == typeof(Nullable<>);
+                    pMap.IsSquashedType = item1.Contains(info.PropertyType);
+                    if (pMap.IsSquashedType)
+                    {
+                        pMap.SquashedValue = info.PropertyType.GetProperties().FirstOrDefault().Name;
+                    }
                     pMap.IsList = info.PropertyType.IsGenericType && 
                          (
                             
@@ -229,7 +244,6 @@ namespace FakeCreator
                             || info.PropertyType.GetGenericTypeDefinition() == typeof(IList<>) 
                             || info.PropertyType.GetGenericTypeDefinition() == typeof(ICollection<>) 
                             || info.PropertyType.GetGenericTypeDefinition() == typeof(IEnumerable<>) 
-
                         );
 
                     pMap.IsDictionary = info.PropertyType.IsGenericType &&
@@ -249,7 +263,15 @@ namespace FakeCreator
                     }
                     else
                     {
-                        pMap.Type = info.PropertyType.Name;
+                        if (pMap.IsSquashedType)
+                        {
+                            pMap.Type = info.PropertyType.GetProperties().FirstOrDefault().PropertyType.Name;
+                        }
+                        else
+                        {
+                            pMap.Type = info.PropertyType.Name;
+                        }
+                            
                     }
 
                     return pMap;
