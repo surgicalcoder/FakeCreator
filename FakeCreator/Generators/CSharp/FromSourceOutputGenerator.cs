@@ -37,6 +37,8 @@ namespace FakeCreator.Generators.CSharp
 
             if (!mapping.IsEnum)
             {
+
+                builder.AppendLine($"\tif (remote == null) {{return null;}}");
                 builder.AppendLine($"\tif (local == null) {{local = new {outputTypeName}();}}");
 
                 foreach (var propertyMapping in mapping.Mappings)

@@ -80,7 +80,14 @@ namespace FakeCreator
             }
 
             MappingList = JSON.Deserialize<List<Mapping>>(File.ReadAllText(Singleton.Instance.InputArgs.MappingFile));
-            
+
+            var combinedPath = Path.GetDirectoryName(Path.GetFullPath(Singleton.Instance.InputArgs.MappingFile)) + "\\__combined\\";
+            if (Directory.Exists(combinedPath))
+            {
+                Directory.Delete(combinedPath, true);
+            }
+            Directory.CreateDirectory(combinedPath);
+
             foreach (var mapping in MappingList)
             {
                 foreach (var instanceOutputGenerator in Singleton.Instance.OutputGenerators)
@@ -94,11 +101,14 @@ namespace FakeCreator
                     }
 
                     var path = Path.GetDirectoryName(Path.GetFullPath(Singleton.Instance.InputArgs.MappingFile)) + "\\" + mapping.Name + "\\";
+
                     if (!Directory.Exists(path))
                     {
                         Directory.CreateDirectory(path);
                     }
+
                     File.WriteAllText(path + instanceOutputGenerator.GetType().FullName + fileExtension, outp );
+                    File.AppendAllText(combinedPath + instanceOutputGenerator.GetType().FullName + fileExtension, outp);
                 }
 
                 foreach (var additionalTemplate in additionalTemplates)
