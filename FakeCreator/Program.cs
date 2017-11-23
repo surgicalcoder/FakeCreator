@@ -220,6 +220,8 @@ namespace FakeCreator
 
             Dictionary<string, string> transformation = string.IsNullOrWhiteSpace(Singleton.Instance.InputArgs.Transformation) ? new Dictionary<string,string>() : Singleton.Instance.InputArgs.Transformation.Split(';').ToDictionary(r => r.Split('>')[0], r => r.Split('>')[1]);
 
+            List<string> refTypes = Singleton.Instance.InputArgs.TypesThatAreRefereces.Split(';', ',').ToList();
+
             foreach (var knownType in KnownTypes)
             {
                 Mapping mapping = new Mapping();
@@ -227,7 +229,9 @@ namespace FakeCreator
                 mapping.FullName = knownType.FullName;
                 mapping.IsMainType = mainTypes.Contains(knownType);
                 mapping.IsEnum = knownType.IsEnum;
+                mapping.IsAReference = refTypes.Contains(mapping.Name);
                 mapping.Assembly = knownType.Assembly.FullName;
+
                 mapping.Mappings = knownType.GetProperties().Select(delegate(PropertyInfo info)
                 {
                     PropertyMapping pMap = new PropertyMapping();
@@ -245,7 +249,15 @@ namespace FakeCreator
                     pMap.IsSquashedType = item1.Contains(info.PropertyType);
                     if (pMap.IsSquashedType)
                     {
-                        pMap.SquashedValue = info.PropertyType.GetProperties().FirstOrDefault().Name;
+                        var squashedTypeValu = info.PropertyType.GetProperties().FirstOrDefault();
+                        if (squashedTypeValu.PropertyType.Namespace == typeof(string).Namespace)
+                        {
+                            pMap.SquashedValue = squashedTypeValu.Name;
+                        }
+                        else
+                        {
+                            pMap.IsSquashedType = false;
+                        }
                     }
                     pMap.IsList = info.PropertyType.IsGenericType && 
                          (
