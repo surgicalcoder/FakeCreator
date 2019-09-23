@@ -12,6 +12,8 @@ namespace FakeCreator
         public bool IsEnum { get; set; }
         public bool IsNullable { get; set; }
         public bool IsList { get; set; }
+        public bool IsSquashedType { get; set; }
+        public string SquashedValue { get; set; }
 
         public bool IsDictionary { get; set; }
 

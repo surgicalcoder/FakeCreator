@@ -35,6 +35,9 @@ namespace FakeCreator
         [ArgDescription("The actual type for a reference")]
         public string IsAReferenceTypeKey { get; set; }
 
+        [ArgDescription("Types that are references")]
+        public string TypesThatAreRefereces { get; set; }
+
         [ArgRequired]
         public string MappingFile { get; set; }
 

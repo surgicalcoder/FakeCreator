@@ -55,7 +55,7 @@ namespace FakeCreator.Generators.CSharp.Nullable
                 
                 if (propertyMapping.IsNullable)
                 {
-                    builder.AppendLine($"\tpublic Nullable<{propertyType}> {propertyName} {{get; set;}}");
+                    builder.AppendLine($"\tpublic {propertyType}? {propertyName} {{get; set;}}");
                 }
                 else if (propertyMapping.IsEnum)
                 {

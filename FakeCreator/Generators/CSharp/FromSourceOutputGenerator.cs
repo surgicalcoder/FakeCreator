@@ -33,11 +33,14 @@ namespace FakeCreator.Generators.CSharp
             string outputTypeName = $"{Singleton.Instance.InputArgs.ClassPrefix ?? ""}{type.Name}{Singleton.Instance.InputArgs.ClassPostfix ?? ""}";
             string methodName = GetRemotePopulatorMethodName(outputTypeName);
 
-            builder.AppendLine($"public static {outputTypeName} {methodName} ({inputTypeName} remote, {outputTypeName} local = null) {{");
+            builder.AppendLine($"public static {outputTypeName} {methodName} (this {inputTypeName} remote, {outputTypeName} local = null) {{");
 
             if (!mapping.IsEnum)
             {
-                builder.AppendLine($"if (local == null) {{local = new {outputTypeName}();}}");
+
+                builder.AppendLine($"\tif (remote == null) {{return null;}}");
+                builder.AppendLine($"\tif (local == null) {{local = new {outputTypeName}();}}");
+
                 foreach (var propertyMapping in mapping.Mappings)
                 {
                     string localPropertyName = String.IsNullOrWhiteSpace(propertyMapping.TransformName)
@@ -48,6 +51,7 @@ namespace FakeCreator.Generators.CSharp
                     string localPropertyType = propertyMapping.Type.IsASimpleType()
                         ? propertyMapping.Type
                         : Singleton.Instance.InputArgs.ClassPrefix + propertyMapping.Type + Singleton.Instance.InputArgs.ClassPostfix;
+
                     string remotePropertyType = propertyMapping.Type;
 
                     if (propertyMapping.IsEnum || type.IsNullableEnum())
@@ -61,8 +65,7 @@ namespace FakeCreator.Generators.CSharp
                         }
                         else if (propertyMapping.IsNullable)
                         {
-                            builder.AppendLine(
-                                $"\tif (remote.{remotePropertyName} != null) {{ local.{localPropertyName} = ({localPropertyType}) Enum.Parse(typeof({localPropertyType}), remote.{remotePropertyName}.ToString() ); }}");
+                            builder.AppendLine($"\tif (remote.{remotePropertyName} != null) {{ local.{localPropertyName} = ({localPropertyType}) Enum.Parse(typeof({localPropertyType}), remote.{remotePropertyName}.ToString() ); }}");
                         }
                         else
                         {
@@ -80,7 +83,7 @@ namespace FakeCreator.Generators.CSharp
                         else
                         {
                             builder.AppendLine(
-                                $"\tif (remote.{remotePropertyName} != null) {{ local.{localPropertyName} = {GetRemotePopulatorMethodName(localPropertyType)} (remote.{remotePropertyName}); }}");
+                                $"\tif (remote.{remotePropertyName} != null) {{ local.{localPropertyName} = remote.{remotePropertyName}.{GetRemotePopulatorMethodName(localPropertyType)}(); }}");
                         }
                     }
                     else if (propertyMapping.IsDictionary)
@@ -125,7 +128,7 @@ namespace FakeCreator.Generators.CSharp
                             dictLine = dictLine.Substring(0, dictLine.Length - 1);
                         }
 
-                        dictLine = dictLine + " }";
+                        dictLine = dictLine + "); }";
 
                         builder.AppendLine(dictLine);
                     }
@@ -133,7 +136,9 @@ namespace FakeCreator.Generators.CSharp
                     {
                         if (propertyMapping.Type.IsASimpleType())
                         {
+
                             builder.AppendLine($"\tif (remote.{remotePropertyName} != null && remote.{remotePropertyName}.Any()) {{ local.{localPropertyName} = remote.{remotePropertyName}.Select(r=> r ).ToList();  }} ");
+
                         }
                         else
                         {
@@ -141,13 +146,12 @@ namespace FakeCreator.Generators.CSharp
 
                             if (internalMapping != null && internalMapping.IsAReference)
                             {
-                                builder.AppendLine(
-                                    $"\tif (remote.{remotePropertyName} != null && remote.{remotePropertyName}.Any()) {{ local.{localPropertyName} = remote.{remotePropertyName}.Select(r=> {string.Format(Singleton.Instance.InputArgs.IsAReferenceTypeFormat, localPropertyType, Singleton.Instance.InputArgs.IsAReferenceTypeLookupKey)} ).ToList();  }} ");
+
+                                builder.AppendLine($"\tif (remote.{remotePropertyName} != null && remote.{remotePropertyName}.Any()) {{ local.{localPropertyName} = remote.{remotePropertyName}.Select(r=> {string.Format(Singleton.Instance.InputArgs.IsAReferenceTypeFormat, localPropertyType, Singleton.Instance.InputArgs.IsAReferenceTypeLookupKey)} ).ToList();  }} ");
                             }
                             else
                             {
-                                builder.AppendLine(
-                                    $"\t if (remote.{remotePropertyName} != null && remote.{remotePropertyName}.Any()) {{ local.{localPropertyName} = remote.{remotePropertyName}.Select(r=> {GetRemotePopulatorMethodName(localPropertyType)}(r) ).ToList();  }} ");
+                                builder.AppendLine($"\tlocal.{localPropertyName} = remote.{remotePropertyName}.{GetRemotePopulatorMethodName(localPropertyType)}(); ");
                             }
                         }
                     }
@@ -162,7 +166,14 @@ namespace FakeCreator.Generators.CSharp
                             }
                             else
                             {
-                                builder.AppendLine($"\tlocal.{localPropertyName} = remote.{remotePropertyName};");
+                                if (propertyMapping.IsSquashedType)
+                                {
+                                    builder.AppendLine($"\tlocal.{localPropertyName} = remote.{remotePropertyName}?.{propertyMapping.SquashedValue};");
+                                }
+                                else
+                                {
+                                    builder.AppendLine($"\tlocal.{localPropertyName} = remote.{remotePropertyName};");
+                                }
                             }
                         }
                         else
@@ -176,8 +187,7 @@ namespace FakeCreator.Generators.CSharp
                             }
                             else
                             {
-                                builder.AppendLine(
-                                    $"\tif (remote.{remotePropertyName} != null) {{ local.{localPropertyName} = {GetRemotePopulatorMethodName(localPropertyType)} (remote.{remotePropertyName}); }}");
+                                builder.AppendLine($"\tlocal.{localPropertyName} = remote.{remotePropertyName}.{GetRemotePopulatorMethodName(localPropertyType)}(); ");
                             }
                         }
                     }
@@ -186,8 +196,17 @@ namespace FakeCreator.Generators.CSharp
                 builder.AppendLine("\treturn local;");
             }
 
-
+            
             builder.AppendLine("}");
+
+            builder.AppendLine("");
+            builder.AppendLine("");
+            builder.AppendLine($"public static List<{outputTypeName}> {methodName} (this IEnumerable<{inputTypeName}> remote) {{");
+            builder.AppendLine($"\tif (remote == null || !remote.Any()){{return null;}}");
+            builder.AppendLine($"\treturn remote.Select(f=>f.{methodName}()).ToList();");
+            builder.AppendLine("}");
+
+
             return builder.ToString();
         }
     }
