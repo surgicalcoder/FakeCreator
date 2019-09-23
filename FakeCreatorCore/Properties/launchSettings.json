@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "FakeCreatorCore": {
+      "commandName": "Project",
+      "commandLineArgs": " -D \"D:\\Work\\+GIT+\\Mendax\\GoLive.Mendax.Domain\\bin\\Debug\\netstandard2.0\\GoLive.Mendax.Domain.dll\" -Te \"D:\\Work\\+GIT+\\Mendax\\_template\\CodeGen\\_Templates\" -G true -M \"D:\\Work\\+GIT+\\Mendax\\_template\\CodeGen\\main.json\" -R Setting,Target,Point,Taxonomy,Certainty"
+    }
+  }
+}
