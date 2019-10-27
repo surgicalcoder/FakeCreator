@@ -116,7 +116,7 @@ namespace FakeCreatorCore
                 }
             }
 
-            File.WriteAllText(Singleton.Instance.InputArgs.MappingFile + ".run.bat", "\"" + Assembly.GetExecutingAssembly().Location + "\" " + string.Join(" ", GetCommandargs()));
+            File.WriteAllText(Singleton.Instance.InputArgs.MappingFile + ".run.bat", "\"" + Assembly.GetExecutingAssembly().Location.Replace(".dll",".exe") + "\" " + string.Join(" ", GetCommandargs()));
         }
 
         private static string[] GetCommandargs()
