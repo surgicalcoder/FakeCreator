@@ -3,8 +3,6 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 16
 VisualStudioVersion = 16.0.29215.179
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FakeCreator", "FakeCreator\FakeCreator.csproj", "{DD9E939C-7209-4C15-9CE5-53642D113C05}"
-EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FakeCreatorCore", "FakeCreatorCore\FakeCreatorCore.csproj", "{562FF20D-AE24-43E7-851E-77272DE250C9}"
 EndProject
 Global
@@ -15,14 +13,6 @@ Global
 		Release|x64 = Release|x64
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{DD9E939C-7209-4C15-9CE5-53642D113C05}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{DD9E939C-7209-4C15-9CE5-53642D113C05}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{DD9E939C-7209-4C15-9CE5-53642D113C05}.Debug|x64.ActiveCfg = Debug|Any CPU
-		{DD9E939C-7209-4C15-9CE5-53642D113C05}.Debug|x64.Build.0 = Debug|Any CPU
-		{DD9E939C-7209-4C15-9CE5-53642D113C05}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{DD9E939C-7209-4C15-9CE5-53642D113C05}.Release|Any CPU.Build.0 = Release|Any CPU
-		{DD9E939C-7209-4C15-9CE5-53642D113C05}.Release|x64.ActiveCfg = Release|x64
-		{DD9E939C-7209-4C15-9CE5-53642D113C05}.Release|x64.Build.0 = Release|x64
 		{562FF20D-AE24-43E7-851E-77272DE250C9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{562FF20D-AE24-43E7-851E-77272DE250C9}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{562FF20D-AE24-43E7-851E-77272DE250C9}.Debug|x64.ActiveCfg = Debug|Any CPU

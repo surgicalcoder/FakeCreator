@@ -6,11 +6,9 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 using Jil;
-using Microsoft.AspNetCore.Razor.CodeGenerators;
 using PowerArgs;
 using RazorEngine.Configuration;
 using RazorEngine.Templating;
-using Utilities.DataTypes.ExtensionMethods;
 
 namespace FakeCreator
 {
@@ -159,14 +157,14 @@ namespace FakeCreator
         {
             List<Type> mainTypes = Singleton.Instance.Assemblies.SelectMany(r=>r.GetTypes()).Where(r => Singleton.Instance.InputArgs.Types.Contains(r.Name)).ToList();
 
-            List<Type> KnownTypes = new List<Type>() {mainTypes};
+            List<Type> KnownTypes = new List<Type>(mainTypes) ;
 
             bool stillLookingUp = true;
 
             while (stillLookingUp)
             {
                 int doINeedToContinue = 0;
-                List<Type> intKnownTypes = new List<Type> {KnownTypes};
+                List<Type> intKnownTypes = new List<Type>(KnownTypes);
                 foreach (var type in intKnownTypes)
                 {
                     var typeName = type.Name;

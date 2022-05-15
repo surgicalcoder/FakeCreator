@@ -32,9 +32,7 @@ namespace FakeCreatorCore
                 FileToLoad.ForEach(r =>
                 {
                     
-                    Singleton.Instance.Assemblies.Add(PluginLoader.CreateFromAssemblyFile(r, PluginLoaderOptions.None).LoadDefaultAssembly());
-
-                    //Singleton.Instance.Assemblies.Add(Assembly.LoadFrom(r));
+                    Singleton.Instance.Assemblies.Add(PluginLoader.CreateFromAssemblyFile(r).LoadDefaultAssembly());
                 });
 
                 SetupOutputGenerators();
@@ -96,7 +94,7 @@ namespace FakeCreatorCore
                         continue;
                     }
 
-                    var path = Path.GetDirectoryName(Path.GetFullPath(Singleton.Instance.InputArgs.MappingFile)) + "\\" + mapping.Name + "\\";
+                    var path = Path.GetDirectoryName(Path.GetFullPath(Singleton.Instance.InputArgs.MappingFile)) + "\\" + mapping.FullName + "\\";
                     if (!Directory.Exists(path))
                     {
                         Directory.CreateDirectory(path);
@@ -108,11 +106,11 @@ namespace FakeCreatorCore
                 {
                     Console.WriteLine($"[{mapping.Name}] Processing Template {additionalTemplate.Key}");
                     var directory = Path.GetDirectoryName(Singleton.Instance.InputArgs.MappingFile);
-                    if (!Directory.Exists(Path.Combine(directory, mapping.Name)))
+                    if (!Directory.Exists(Path.Combine(directory, mapping.FullName)))
                     {
-                        Directory.CreateDirectory(Path.Combine(directory, mapping.Name));
+                        Directory.CreateDirectory(Path.Combine(directory, mapping.FullName));
                     }
-                    File.WriteAllText(Path.Combine(directory, mapping.Name, string.Format(additionalTemplate.Key, mapping.Name)).Replace(".cshtml", ""), PerformRazor(additionalTemplate.Key, additionalTemplate.Value, mapping));
+                    File.WriteAllText(Path.Combine(directory, mapping.FullName, string.Format(additionalTemplate.Key, mapping.Name)).Replace(".cshtml", ""), PerformRazor(additionalTemplate.Key, additionalTemplate.Value, mapping));
                 }
             }
 
@@ -165,34 +163,32 @@ namespace FakeCreatorCore
                         {
                             continue;
                         }
-                        else
+
+                        if (propertyInfo.PropertyType.IsGenericType)
                         {
-                            if (propertyInfo.PropertyType.IsGenericType)
+                            foreach (var argument in propertyInfo.PropertyType.GenericTypeArguments)
                             {
-                                foreach (var argument in propertyInfo.PropertyType.GenericTypeArguments)
-                                {
-                                    if (KnownTypes.Contains(argument))
-                                    {
-                                        continue;
-                                    }
-                                    else
-                                    {
-                                        KnownTypes.Add(argument);
-                                        doINeedToContinue++;
-                                    }
-                                }
-                            }
-                            else
-                            {
-                                if (KnownTypes.Contains(propertyInfo.PropertyType))
+                                if (KnownTypes.Contains(argument))
                                 {
                                     continue;
                                 }
                                 else
                                 {
-                                    KnownTypes.Add(propertyInfo.PropertyType);
+                                    KnownTypes.Add(argument);
                                     doINeedToContinue++;
                                 }
+                            }
+                        }
+                        else
+                        {
+                            if (KnownTypes.Contains(propertyInfo.PropertyType))
+                            {
+                                continue;
+                            }
+                            else
+                            {
+                                KnownTypes.Add(propertyInfo.PropertyType);
+                                doINeedToContinue++;
                             }
                         }
                     }
@@ -227,15 +223,16 @@ namespace FakeCreatorCore
                     pMap.IsGeneric = info.PropertyType.IsGenericType;
                     pMap.IsEnum = (info.PropertyType.IsEnum || info.PropertyType.IsNullableEnum());
                     pMap.IsNullable = info.PropertyType.IsGenericType && info.PropertyType.GetGenericTypeDefinition() == typeof(Nullable<>);
+                    
+                    pMap.Attributes = info.CustomAttributes.Select(f => f.AttributeType.Name).Distinct().ToList();
+                    
                     pMap.IsList = info.PropertyType.IsGenericType &&
                          (
-
-                            info.PropertyType.GetGenericTypeDefinition() == typeof(List<>)
+                             info.PropertyType.GetGenericTypeDefinition() == typeof(List<>)
                             || info.PropertyType.GetGenericTypeDefinition() == typeof(IList<>)
                             || info.PropertyType.GetGenericTypeDefinition() == typeof(ICollection<>)
                             || info.PropertyType.GetGenericTypeDefinition() == typeof(IEnumerable<>)
-
-                        );
+                         );
 
                     pMap.IsDictionary = info.PropertyType.IsGenericType &&
                     (
