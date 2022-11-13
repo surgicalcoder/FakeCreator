@@ -7,6 +7,7 @@ namespace FakeCreatorCore
     public class Mapping
     {
         public string Name { get; set; }
+        public string HumanizedName { get; set; }
         public string FullName { get; set; }
         public string Assembly { get; set; }
         public bool IsMainType { get; set; }

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using Humanizer;
 using McMaster.NETCore.Plugins;
 using Newtonsoft.Json;
 using PowerArgs;
@@ -204,6 +205,7 @@ namespace FakeCreatorCore
             {
                 Mapping mapping = new Mapping();
                 mapping.Name = knownType.Name;
+                mapping.HumanizedName = mapping.Name.Humanize();
                 mapping.FullName = knownType.FullName;
                 mapping.IsMainType = mainTypes.Contains(knownType);
                 mapping.IsEnum = knownType.IsEnum;
@@ -217,6 +219,8 @@ namespace FakeCreatorCore
                     {
                         pMap.TransformName = transformation[info.Name];
                     }
+
+                    pMap.HumanizedName = info.Name.Humanize();
                     pMap.IsGeneric = info.PropertyType.IsGenericType;
                     pMap.IsEnum = (info.PropertyType.IsEnum || info.PropertyType.IsNullableEnum());
                     pMap.IsNullable = info.PropertyType.IsGenericType && info.PropertyType.GetGenericTypeDefinition() == typeof(Nullable<>);
