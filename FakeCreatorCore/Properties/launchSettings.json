@@ -1,8 +1,0 @@
-{
-  "profiles": {
-    "FakeCreatorCore": {
-      "commandName": "Project",
-      "commandLineArgs": "-D \"D:\\Work\\+ FA +\\App\\FictionApplied.Prax.Domain\\bin\\Debug\\net6.0\\FictionApplied.Prax.Domain.dll\" -Te \"D:\\Work\\+ FA +\\App\\_templates\\CodeGen\\_Templates\" -G true -M \"D:\\Work\\+ FA +\\App\\_templates\\CodeGen\\main.json\" -R User,Role,Tenant,Customer,TaskItem,Upload,Appointment,Location,Room,EmailTemplate,Telephone,PhysicalAddress,ImportantNotice,ConfigurableSetting,AdditionalSetting,Form,FormGroup,FormItem,MultipleSelectFormItem,FilledInForm,StaticAsset,TenantAnnouncement,TenantUpload,Message,TenantMessageTemplate,Setting,TenantMessageDepartment,BillingTax,BillingCategory,BillingItem,BillingService,BillingPackage,TenantDiscount,TenantInvoiceDetails,TenantPaymentTypes,Invoice,UserNote"
-    }
-  }
-}

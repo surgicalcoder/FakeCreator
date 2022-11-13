@@ -3,9 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
-using System.Runtime.Loader;
 using McMaster.NETCore.Plugins;
-using Microsoft.Extensions.DependencyModel;
 using Newtonsoft.Json;
 using PowerArgs;
 using RazorEngine.Configuration;
@@ -13,7 +11,6 @@ using RazorEngine.Templating;
 
 namespace FakeCreatorCore
 {
-
     class Program
     {
         static void Main(string[] args)
@@ -31,8 +28,8 @@ namespace FakeCreatorCore
 
                 FileToLoad.ForEach(r =>
                 {
-                    
-                    Singleton.Instance.Assemblies.Add(PluginLoader.CreateFromAssemblyFile(r).LoadDefaultAssembly());
+                    var resolver = new AssemblyResolver(r);
+                    Singleton.Instance.Assemblies.Add(resolver.InitialAssembly);
                 });
 
                 SetupOutputGenerators();
@@ -71,7 +68,7 @@ namespace FakeCreatorCore
         private static List<Mapping> MappingList;
         private static void GenerateClasses()
         {
-            Dictionary<string, string> additionalTemplates = new Dictionary<string, string>();
+            var additionalTemplates = new Dictionary<string, string>();
             if (!String.IsNullOrWhiteSpace(Singleton.Instance.InputArgs.TemplateDirectory) && Directory.Exists(Singleton.Instance.InputArgs.TemplateDirectory))
             {
                 foreach (var file in Directory.GetFiles(Singleton.Instance.InputArgs.TemplateDirectory))
@@ -121,7 +118,7 @@ namespace FakeCreatorCore
         {
             return Environment.GetCommandLineArgs().Skip(1).Select((s, i) =>
             {
-                if (s.Contains(" "))
+                if (s.Contains(' '))
                 {
                     return "\"" + s + "\"";
                 }
@@ -131,7 +128,7 @@ namespace FakeCreatorCore
 
         private static string PerformRazor(string file, string template, Mapping mapping)
         {
-            TemplateServiceConfiguration config = new TemplateServiceConfiguration();
+            var config = new TemplateServiceConfiguration();
             config.DisableTempFileLocking = true;
             config.CachingProvider = new DefaultCachingProvider(t => { });
 
@@ -263,20 +260,4 @@ namespace FakeCreatorCore
             File.WriteAllText(Singleton.Instance.InputArgs.MappingFile, JsonConvert.SerializeObject(mappings));
         }
     }
-
-
-    public class MyRazorTemplate<T> : RazorEngine.Templating.TemplateBase<T>
-    {
-        protected void BeginContext(string virtualPath, int startPosition, int length, bool isLiteral) { }
-
-        protected void EndContext(string virtualPath, int startPosition, int length, bool isLiteral) { }
-
-        protected Fake Context { get; set; }
-
-        public class Fake
-        {
-            public object ApplicationInstance { get; set; }
-        }
-    }
-
 }
