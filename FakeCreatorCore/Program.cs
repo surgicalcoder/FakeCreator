@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -84,20 +84,27 @@ namespace FakeCreatorCore
             {
                 foreach (var instanceOutputGenerator in Singleton.Instance.OutputGenerators)
                 {
-                    string fileExtension = instanceOutputGenerator.GetFileExtension(mapping);
-                    var outp = instanceOutputGenerator.Generate(mapping);
-
-                    if (String.IsNullOrWhiteSpace(outp))
+                    try
                     {
-                        continue;
-                    }
+                        string fileExtension = instanceOutputGenerator.GetFileExtension(mapping);
+                        var outp = instanceOutputGenerator.Generate(mapping);
 
-                    var path = Path.GetDirectoryName(Path.GetFullPath(Singleton.Instance.InputArgs.MappingFile)) + "\\" + mapping.FullName + "\\";
-                    if (!Directory.Exists(path))
-                    {
-                        Directory.CreateDirectory(path);
+                        if (string.IsNullOrWhiteSpace(outp))
+                        {
+                            continue;
+                        }
+
+                        var path = Path.GetDirectoryName(Path.GetFullPath(Singleton.Instance.InputArgs.MappingFile)) + "\\" + mapping.FullName + "\\";
+                        if (!Directory.Exists(path))
+                        {
+                            Directory.CreateDirectory(path);
+                        }
+                        File.WriteAllText(path + instanceOutputGenerator.GetType().FullName + fileExtension, outp);
                     }
-                    File.WriteAllText(path + instanceOutputGenerator.GetType().FullName + fileExtension, outp);
+                    catch (Exception e)
+                    {
+                        Console.WriteLine(e);
+                    }
                 }
 
                 foreach (var additionalTemplate in additionalTemplates)
@@ -112,7 +119,7 @@ namespace FakeCreatorCore
                 }
             }
 
-            File.WriteAllText(Singleton.Instance.InputArgs.MappingFile + ".run.bat", "\"" + Assembly.GetExecutingAssembly().Location.Replace(".dll",".exe") + "\" " + string.Join(" ", GetCommandargs()));
+            File.WriteAllText($"{Singleton.Instance.InputArgs.MappingFile}.run.bat", $"\"{Assembly.GetExecutingAssembly().Location.Replace(".dll", ".exe")}\" {string.Join(" ", GetCommandargs())}");
         }
 
         private static string[] GetCommandargs()
@@ -121,7 +128,7 @@ namespace FakeCreatorCore
             {
                 if (s.Contains(' '))
                 {
-                    return "\"" + s + "\"";
+                    return $"\"{s}\"";
                 }
                 return s;
             }).ToArray();
