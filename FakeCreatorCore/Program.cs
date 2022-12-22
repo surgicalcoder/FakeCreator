@@ -3,20 +3,19 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Threading.Tasks;
 using Humanizer;
 using McMaster.NETCore.Plugins;
 using Newtonsoft.Json;
 using PowerArgs;
-using RazorEngine.Configuration;
-using RazorEngine.Templating;
+using RazorLight;
 
 namespace FakeCreatorCore
 {
     class Program
     {
-        static void Main(string[] args)
+        static async Task Main(string[] args)
         {
-
             try
             {
                 var parsed = Args.Parse<InputArgs>(args);
@@ -37,12 +36,12 @@ namespace FakeCreatorCore
 
                 if (parsed.GenerateMappingFile)
                 {
-                    GenerateMapping();
-                    GenerateClasses();
+                    await GenerateMapping();
+                    await GenerateClasses();
                 }
                 else
                 {
-                    GenerateClasses();
+                    await GenerateClasses();
                 }
             }
             catch (ArgException ex)
@@ -67,18 +66,18 @@ namespace FakeCreatorCore
         }
 
         private static List<Mapping> MappingList;
-        private static void GenerateClasses()
+        private static async Task GenerateClasses()
         {
             var additionalTemplates = new Dictionary<string, string>();
             if (!String.IsNullOrWhiteSpace(Singleton.Instance.InputArgs.TemplateDirectory) && Directory.Exists(Singleton.Instance.InputArgs.TemplateDirectory))
             {
                 foreach (var file in Directory.GetFiles(Singleton.Instance.InputArgs.TemplateDirectory))
                 {
-                    additionalTemplates.Add(Path.GetFileName(file), File.ReadAllText(file));
+                    additionalTemplates.Add(Path.GetFileName(file), await File.ReadAllTextAsync(file));
                 }
             }
 
-            MappingList = JsonConvert.DeserializeObject<List<Mapping>>(File.ReadAllText(Singleton.Instance.InputArgs.MappingFile));
+            MappingList = JsonConvert.DeserializeObject<List<Mapping>>(await File.ReadAllTextAsync(Singleton.Instance.InputArgs.MappingFile));
 
             foreach (var mapping in MappingList)
             {
@@ -94,12 +93,12 @@ namespace FakeCreatorCore
                             continue;
                         }
 
-                        var path = Path.GetDirectoryName(Path.GetFullPath(Singleton.Instance.InputArgs.MappingFile)) + "\\" + mapping.FullName + "\\";
+                        var path = $"{Path.GetDirectoryName(Path.GetFullPath(Singleton.Instance.InputArgs.MappingFile))}\\{mapping.FullName}\\";
                         if (!Directory.Exists(path))
                         {
                             Directory.CreateDirectory(path);
                         }
-                        File.WriteAllText(path + instanceOutputGenerator.GetType().FullName + fileExtension, outp);
+                        await File.WriteAllTextAsync($"{path}{instanceOutputGenerator.GetType().FullName}{fileExtension}", outp);
                     }
                     catch (Exception e)
                     {
@@ -115,11 +114,13 @@ namespace FakeCreatorCore
                     {
                         Directory.CreateDirectory(Path.Combine(directory, mapping.FullName));
                     }
-                    File.WriteAllText(Path.Combine(directory, mapping.FullName, string.Format(additionalTemplate.Key, mapping.Name)).Replace(".cshtml", ""), PerformRazor(additionalTemplate.Key, additionalTemplate.Value, mapping));
+
+                    var contents = await PerformRazor(additionalTemplate.Key, additionalTemplate.Value, mapping);
+                    await File.WriteAllTextAsync(Path.Combine(directory, mapping.FullName, string.Format(additionalTemplate.Key, mapping.Name)).Replace(".cshtml", ""), contents);
                 }
             }
 
-            File.WriteAllText($"{Singleton.Instance.InputArgs.MappingFile}.run.bat", $"\"{Assembly.GetExecutingAssembly().Location.Replace(".dll", ".exe")}\" {string.Join(" ", GetCommandargs())}");
+            await File.WriteAllTextAsync($"{Singleton.Instance.InputArgs.MappingFile}.run.bat", $"\"{Assembly.GetExecutingAssembly().Location.Replace(".dll", ".exe")}\" {string.Join(" ", GetCommandargs())}");
         }
 
         private static string[] GetCommandargs()
@@ -134,19 +135,20 @@ namespace FakeCreatorCore
             }).ToArray();
         }
 
-        private static string PerformRazor(string file, string template, Mapping mapping)
+        private static async Task<string> PerformRazor(string fileName, string templateContents, Mapping mapping)
         {
-            var config = new TemplateServiceConfiguration();
-            config.DisableTempFileLocking = true;
-            config.CachingProvider = new DefaultCachingProvider(t => { });
+            var engine = new RazorLightEngineBuilder()
+                .UseFileSystemProject(Singleton.Instance.InputArgs.TemplateDirectory)
+                .SetOperatingAssembly(typeof(Program).Assembly)
+                .UseMemoryCachingProvider()
+                .Build();
 
-            var razorEngineService = RazorEngineService.Create(config);
+            string result = await engine.CompileRenderStringAsync(fileName, templateContents, mapping);
 
-            var result = razorEngineService.RunCompile(template, file, null, mapping);
             return result;
         }
 
-        private static void GenerateMapping()
+        private static async Task GenerateMapping()
         {
             List<Type> mainTypes = Singleton.Instance.Assemblies.SelectMany(r => r.GetTypes()).Where(r => Singleton.Instance.InputArgs.Types.Contains(r.Name)).ToList();
 
@@ -268,7 +270,7 @@ namespace FakeCreatorCore
                 mappings.Add(mapping);
             }
             Singleton.Instance.MappingList = mappings;
-            File.WriteAllText(Singleton.Instance.InputArgs.MappingFile, JsonConvert.SerializeObject(mappings));
+            await File.WriteAllTextAsync(Singleton.Instance.InputArgs.MappingFile, JsonConvert.SerializeObject(mappings));
         }
     }
 }

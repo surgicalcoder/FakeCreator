@@ -12,8 +12,12 @@
     <PackageReference Include="Microsoft.Extensions.DependencyModel" Version="7.0.0" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
     <PackageReference Include="PowerArgs" Version="3.6.0" />
-    <PackageReference Include="RazorEngine.NetCore" Version="3.1.0" />
+    <PackageReference Include="RazorLight" Version="2.3.0" />
     <PackageReference Include="System.Configuration.ConfigurationManager" Version="7.0.0" />
   </ItemGroup>
+  <PropertyGroup>
+  <!-- This group contains project properties for RazorLight on .NET Core -->
+  <PreserveCompilationContext>true</PreserveCompilationContext>
+  </PropertyGroup>
 
 </Project>
