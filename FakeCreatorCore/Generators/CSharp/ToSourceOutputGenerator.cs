@@ -85,9 +85,9 @@ namespace FakeCreatorCore.Generators.CSharp
                 {
                     string dictLine = $"\tif (remote.{remotePropertyName} != null && remote.{remotePropertyName}.Any()) {{";
                     dictLine += $"local.{localPropertyName} = remote.{remotePropertyName}.ToDictionary(";
-                    dictLine += BuildDictEntry(propertyMapping.DictionaryKeyType, "Key");
+                    dictLine += BuildDictEntry(propertyMapping.ResolvedDictionaryKeyType, "Key");
                     dictLine += ", ";
-                    dictLine += BuildDictEntry(propertyMapping.DictionaryValueType, "Value");
+                    dictLine += BuildDictEntry(propertyMapping.ResolvedDictionaryValueType, "Value");
                     dictLine += "); }}";
 
                     builder.AppendLine(dictLine);

@@ -64,7 +64,7 @@ namespace FakeCreatorCore.Generators.CSharp.Nullable
                 }
                 else if (propertyMapping.IsDictionary)
                 {
-                    builder.AppendLine($"\tpublic Dictionary<{propertyMapping.DictionaryKeyType}, {propertyMapping.DictionaryValueType}> {propertyName} {{get; set;}}");
+                    builder.AppendLine($"\tpublic Dictionary<{propertyMapping.ResolvedDictionaryKeyType}, {propertyMapping.ResolvedDictionaryValueType}> {propertyName} {{get; set;}}");
                 }
                 else
                 {

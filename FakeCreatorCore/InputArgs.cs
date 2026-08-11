@@ -39,6 +39,11 @@ namespace FakeCreatorCore
         public string MappingFile { get; set; }
 
         public string TemplateDirectory { get; set; }
-        
+
+        [ArgDefaultValue(false)]
+        public bool SkipBuiltinGenerators { get; set; }
+
+        public List<string> IgnoreTypesFromNamespace { get; set; } = new();
+
     }
 }

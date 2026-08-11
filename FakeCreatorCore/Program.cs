@@ -32,7 +32,10 @@ class Program
                 Singleton.Instance.Assemblies.Add(resolver.InitialAssembly);
             });
 
-            SetupOutputGenerators();
+            if (!parsed.SkipBuiltinGenerators)
+            {
+                SetupOutputGenerators();
+            }
 
             if (parsed.GenerateMappingFile)
             {
@@ -172,7 +175,11 @@ class Program
             {
                 foreach (var propertyInfo in type.GetProperties())
                 {
-                    if ((!propertyInfo.PropertyType.IsEnum && !propertyInfo.PropertyType.IsNullableEnum()) && (propertyInfo.PropertyType.IsTypeASimpleType() || propertyInfo.PropertyType.IsTypeAGenericSimpleType()))
+                    if (
+                        (!propertyInfo.PropertyType.IsEnum && !propertyInfo.PropertyType.IsNullableEnum())
+                        && (propertyInfo.PropertyType.IsTypeASimpleType() || propertyInfo.PropertyType.IsTypeAGenericSimpleType())
+                        && !Singleton.Instance.InputArgs.IgnoreTypesFromNamespace.Contains(propertyInfo.PropertyType.Namespace)
+                    )
                     {
                         continue;
                     }
@@ -210,6 +217,7 @@ class Program
             stillLookingUp = doINeedToContinue > 0;
         }
 
+        KnownTypes.RemoveAll(r => Singleton.Instance.InputArgs.IgnoreTypesFromNamespace.Contains(r.Namespace));
         KnownTypes.RemoveAll(r => r.Assembly == typeof(DateTime).Assembly);
 
         List<Mapping> mappings = new List<Mapping>();
@@ -221,6 +229,7 @@ class Program
             Mapping mapping = new Mapping();
             mapping.Name = knownType.Name;
             mapping.HumanizedName = mapping.Name.Humanize();
+            mapping.PluralizedHumanizedName = mapping.Name.Pluralize();
             mapping.FullName = knownType.FullName;
             mapping.IsMainType = mainTypes.Contains(knownType);
             mapping.IsEnum = knownType.IsEnum;
@@ -266,6 +275,8 @@ class Program
                 if (pMap.IsGeneric)
                 {
                     pMap.Type = info.PropertyType.GetGenericArguments().FirstOrDefault().Name;
+                    pMap.GenericTypeName = info.PropertyType.GetGenericTypeDefinition().Name;
+                    pMap.GenericTypeFullName = info.PropertyType.GetGenericTypeDefinition().FullName;
                 }
                 else
                 {

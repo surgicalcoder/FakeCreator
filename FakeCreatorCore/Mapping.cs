@@ -9,6 +9,7 @@ namespace FakeCreatorCore
     {
         public string Name { get; set; }
         public string HumanizedName { get; set; }
+        public string PluralizedHumanizedName { get; set; }
         public string FullName { get; set; }
         public string Assembly { get; set; }
         public bool IsMainType { get; set; }
