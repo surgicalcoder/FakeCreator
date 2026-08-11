@@ -10,267 +10,274 @@ using Newtonsoft.Json;
 using PowerArgs;
 using RazorLight;
 
-namespace FakeCreatorCore
+namespace FakeCreatorCore;
+
+class Program
 {
-    class Program
+    static async Task Main(string[] args)
     {
-        static async Task Main(string[] args)
+        try
         {
-            try
+            var parsed = Args.Parse<InputArgs>(args);
+
+            string[] FileToLoad = parsed.Dll.Split(new char[] { ',', ';' });
+            parsed.Types = parsed.RawTypes.Split(new char[] { ',', ';' }).ToList();
+            Singleton.Instance.InputArgs = parsed;
+
+            Singleton.Instance.Assemblies = new List<Assembly>();
+
+            FileToLoad.ForEach(r =>
             {
-                var parsed = Args.Parse<InputArgs>(args);
+                var resolver = new AssemblyResolver(r);
+                Singleton.Instance.Assemblies.Add(resolver.InitialAssembly);
+            });
 
-                string[] FileToLoad = parsed.Dll.Split(new char[] { ',', ';' });
-                parsed.Types = parsed.RawTypes.Split(new char[] { ',', ';' }).ToList();
-                Singleton.Instance.InputArgs = parsed;
+            SetupOutputGenerators();
 
-                Singleton.Instance.Assemblies = new List<Assembly>();
-
-                FileToLoad.ForEach(r =>
-                {
-                    var resolver = new AssemblyResolver(r);
-                    Singleton.Instance.Assemblies.Add(resolver.InitialAssembly);
-                });
-
-                SetupOutputGenerators();
-
-                if (parsed.GenerateMappingFile)
-                {
-                    await GenerateMapping();
-                    await GenerateClasses();
-                }
-                else
-                {
-                    await GenerateClasses();
-                }
+            if (parsed.GenerateMappingFile)
+            {
+                await GenerateMapping();
+                await GenerateClasses();
             }
-            catch (ArgException ex)
+            else
             {
-                Console.WriteLine(ex.Message);
-                Console.WriteLine(ArgUsage.GenerateUsageFromTemplate<InputArgs>());
+                await GenerateClasses();
+            }
+        }
+        catch (ArgException ex)
+        {
+            Console.WriteLine(ex.Message);
+            Console.WriteLine(ArgUsage.GenerateUsageFromTemplate<InputArgs>());
+        }
+    }
+
+    private static void SetupOutputGenerators()
+    {
+
+        var enumerable = typeof(Program).Assembly.GetTypes().Where(r => !r.IsInterface && typeof(IOutputGenerator).IsAssignableFrom(r));
+        foreach (var type in enumerable)
+        {
+            Console.WriteLine($"Found Generator : {type.FullName}");
+            if (Activator.CreateInstance(type) is IOutputGenerator outputGenerator)
+            {
+                Singleton.Instance.OutputGenerators.Add(outputGenerator);
+            }
+        }
+    }
+
+    private static List<Mapping> MappingList;
+    private static async Task GenerateClasses()
+    {
+        var additionalTemplates = new Dictionary<string, string>();
+        if (!String.IsNullOrWhiteSpace(Singleton.Instance.InputArgs.TemplateDirectory) && Directory.Exists(Singleton.Instance.InputArgs.TemplateDirectory))
+        {
+            foreach (var file in Directory.GetFiles(Singleton.Instance.InputArgs.TemplateDirectory))
+            {
+                additionalTemplates.Add(Path.GetFileName(file), await File.ReadAllTextAsync(file));
             }
         }
 
-        private static void SetupOutputGenerators()
+        MappingList = JsonConvert.DeserializeObject<List<Mapping>>(await File.ReadAllTextAsync(Singleton.Instance.InputArgs.MappingFile));
+        Singleton.Instance.MappingIndex = MappingList.GroupBy(r => r.Name).ToDictionary(g => g.Key, g => g.First());
+
+        foreach (var mapping in MappingList)
         {
-
-            var enumerable = typeof(Program).Assembly.GetTypes().Where(r => !r.IsInterface && typeof(IOutputGenerator).IsAssignableFrom(r));
-            foreach (var type in enumerable)
+            foreach (var instanceOutputGenerator in Singleton.Instance.OutputGenerators)
             {
-                Console.WriteLine($"Found Generator : {type.FullName}");
-                if (Activator.CreateInstance(type) is IOutputGenerator outputGenerator)
+                try
                 {
-                    Singleton.Instance.OutputGenerators.Add(outputGenerator);
-                }
-            }
-        }
+                    string fileExtension = instanceOutputGenerator.GetFileExtension(mapping);
+                    var outp = instanceOutputGenerator.Generate(mapping);
 
-        private static List<Mapping> MappingList;
-        private static async Task GenerateClasses()
-        {
-            var additionalTemplates = new Dictionary<string, string>();
-            if (!String.IsNullOrWhiteSpace(Singleton.Instance.InputArgs.TemplateDirectory) && Directory.Exists(Singleton.Instance.InputArgs.TemplateDirectory))
-            {
-                foreach (var file in Directory.GetFiles(Singleton.Instance.InputArgs.TemplateDirectory))
-                {
-                    additionalTemplates.Add(Path.GetFileName(file), await File.ReadAllTextAsync(file));
-                }
-            }
-
-            MappingList = JsonConvert.DeserializeObject<List<Mapping>>(await File.ReadAllTextAsync(Singleton.Instance.InputArgs.MappingFile));
-
-            foreach (var mapping in MappingList)
-            {
-                foreach (var instanceOutputGenerator in Singleton.Instance.OutputGenerators)
-                {
-                    try
+                    if (string.IsNullOrWhiteSpace(outp))
                     {
-                        string fileExtension = instanceOutputGenerator.GetFileExtension(mapping);
-                        var outp = instanceOutputGenerator.Generate(mapping);
-
-                        if (string.IsNullOrWhiteSpace(outp))
-                        {
-                            continue;
-                        }
-
-                        var path = $"{Path.GetDirectoryName(Path.GetFullPath(Singleton.Instance.InputArgs.MappingFile))}\\{mapping.FullName}\\";
-                        if (!Directory.Exists(path))
-                        {
-                            Directory.CreateDirectory(path);
-                        }
-                        await File.WriteAllTextAsync($"{path}{instanceOutputGenerator.GetType().FullName}{fileExtension}", outp);
-                    }
-                    catch (Exception e)
-                    {
-                        Console.WriteLine(e);
-                    }
-                }
-
-                foreach (var additionalTemplate in additionalTemplates)
-                {
-                    Console.WriteLine($"[{mapping.Name}] Processing Template {additionalTemplate.Key}");
-                    var directory = Path.GetDirectoryName(Singleton.Instance.InputArgs.MappingFile);
-                    if (!Directory.Exists(Path.Combine(directory, mapping.FullName)))
-                    {
-                        Directory.CreateDirectory(Path.Combine(directory, mapping.FullName));
+                        continue;
                     }
 
-                    var contents = await PerformRazor(additionalTemplate.Key, additionalTemplate.Value, mapping);
-                    await File.WriteAllTextAsync(Path.Combine(directory, mapping.FullName, string.Format(additionalTemplate.Key, mapping.Name)).Replace(".cshtml", ""), contents);
+                    var path = $"{Path.GetDirectoryName(Path.GetFullPath(Singleton.Instance.InputArgs.MappingFile))}\\{mapping.FullName}\\";
+                    if (!Directory.Exists(path))
+                    {
+                        Directory.CreateDirectory(path);
+                    }
+                    await File.WriteAllTextAsync($"{path}{instanceOutputGenerator.GetType().Name.Replace("OutputGenerator", "")}{fileExtension}", outp);
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine(e);
                 }
             }
 
-            await File.WriteAllTextAsync($"{Singleton.Instance.InputArgs.MappingFile}.run.bat", $"\"{Assembly.GetExecutingAssembly().Location.Replace(".dll", ".exe")}\" {string.Join(" ", GetCommandargs())}");
-        }
-
-        private static string[] GetCommandargs()
-        {
-            return Environment.GetCommandLineArgs().Skip(1).Select((s, i) =>
+            foreach (var additionalTemplate in additionalTemplates)
             {
-                if (s.Contains(' '))
+                Console.WriteLine($"[{mapping.Name}] Processing Template {additionalTemplate.Key}");
+                var directory = Path.GetDirectoryName(Singleton.Instance.InputArgs.MappingFile);
+                if (!Directory.Exists(Path.Combine(directory, mapping.FullName)))
                 {
-                    return $"\"{s}\"";
+                    Directory.CreateDirectory(Path.Combine(directory, mapping.FullName));
                 }
-                return s;
-            }).ToArray();
+
+                var contents = await PerformRazor(additionalTemplate.Key, additionalTemplate.Value, mapping);
+                await File.WriteAllTextAsync(Path.Combine(directory, mapping.FullName, string.Format(additionalTemplate.Key, mapping.Name)).Replace(".cshtml", ""), contents);
+            }
         }
 
-        private static async Task<string> PerformRazor(string fileName, string templateContents, Mapping mapping)
+        await File.WriteAllTextAsync($"{Singleton.Instance.InputArgs.MappingFile}.run.bat", $"\"{Assembly.GetExecutingAssembly().Location.Replace(".dll", ".exe")}\" {string.Join(" ", GetCommandargs())}");
+    }
+
+    private static string[] GetCommandargs()
+    {
+        return Environment.GetCommandLineArgs().Skip(1).Select((s, i) =>
         {
-            var engine = new RazorLightEngineBuilder()
-                .UseFileSystemProject(Singleton.Instance.InputArgs.TemplateDirectory)
-                .SetOperatingAssembly(typeof(Program).Assembly)
-                .UseMemoryCachingProvider()
-                .Build();
-
-            string result = await engine.CompileRenderStringAsync(fileName, templateContents, mapping);
-
-            return result;
-        }
-
-        private static async Task GenerateMapping()
-        {
-            List<Type> mainTypes = Singleton.Instance.Assemblies.SelectMany(r => r.GetTypes()).Where(r => Singleton.Instance.InputArgs.Types.Contains(r.Name)).ToList();
-
-            List<Type> KnownTypes = new List<Type>();
-            KnownTypes.AddRange(mainTypes);
-
-            bool stillLookingUp = true;
-
-            while (stillLookingUp)
+            if (s.Contains(' '))
             {
-                int doINeedToContinue = 0;
-                List<Type> intKnownTypes = new List<Type>();
-                intKnownTypes.AddRange(KnownTypes);
-                foreach (var type in intKnownTypes)
-                {
-                    foreach (var propertyInfo in type.GetProperties())
-                    {
-                        if ((!propertyInfo.PropertyType.IsEnum && !propertyInfo.PropertyType.IsNullableEnum()) && (propertyInfo.PropertyType.IsTypeASimpleType() || propertyInfo.PropertyType.IsTypeAGenericSimpleType()))
-                        {
-                            continue;
-                        }
+                return $"\"{s}\"";
+            }
+            return s;
+        }).ToArray();
+    }
 
-                        if (propertyInfo.PropertyType.IsGenericType)
+    private static RazorLightEngine _razorEngine;
+
+    private static async Task<string> PerformRazor(string fileName, string templateContents, Mapping mapping)
+    {
+        if (_razorEngine == null)
+        {
+            _razorEngine = new RazorLightEngineBuilder()
+                          .UseFileSystemProject(Singleton.Instance.InputArgs.TemplateDirectory)
+                          .SetOperatingAssembly(typeof(Program).Assembly)
+                          .UseMemoryCachingProvider()
+                          .Build();
+        }
+
+        string result = await _razorEngine.CompileRenderStringAsync(fileName, templateContents, mapping);
+
+        return result;
+    }
+
+    private static async Task GenerateMapping()
+    {
+        List<Type> mainTypes = Singleton.Instance.Assemblies.SelectMany(r => r.GetTypes()).Where(r => Singleton.Instance.InputArgs.Types.Contains(r.Name)).ToList();
+
+        List<Type> KnownTypes = new List<Type>();
+        KnownTypes.AddRange(mainTypes);
+
+        bool stillLookingUp = true;
+
+        while (stillLookingUp)
+        {
+            int doINeedToContinue = 0;
+            List<Type> intKnownTypes = new List<Type>();
+            intKnownTypes.AddRange(KnownTypes);
+            foreach (var type in intKnownTypes)
+            {
+                foreach (var propertyInfo in type.GetProperties())
+                {
+                    if ((!propertyInfo.PropertyType.IsEnum && !propertyInfo.PropertyType.IsNullableEnum()) && (propertyInfo.PropertyType.IsTypeASimpleType() || propertyInfo.PropertyType.IsTypeAGenericSimpleType()))
+                    {
+                        continue;
+                    }
+
+                    if (propertyInfo.PropertyType.IsGenericType)
+                    {
+                        foreach (var argument in propertyInfo.PropertyType.GenericTypeArguments)
                         {
-                            foreach (var argument in propertyInfo.PropertyType.GenericTypeArguments)
-                            {
-                                if (KnownTypes.Contains(argument))
-                                {
-                                    continue;
-                                }
-                                else
-                                {
-                                    KnownTypes.Add(argument);
-                                    doINeedToContinue++;
-                                }
-                            }
-                        }
-                        else
-                        {
-                            if (KnownTypes.Contains(propertyInfo.PropertyType))
+                            if (KnownTypes.Contains(argument))
                             {
                                 continue;
                             }
                             else
                             {
-                                KnownTypes.Add(propertyInfo.PropertyType);
+                                KnownTypes.Add(argument);
                                 doINeedToContinue++;
                             }
                         }
                     }
-                }
-
-                stillLookingUp = doINeedToContinue > 0;
-            }
-
-            KnownTypes.RemoveAll(r => r.Assembly == typeof(DateTime).Assembly);
-
-            List<Mapping> mappings = new List<Mapping>();
-
-            Dictionary<string, string> transformation = string.IsNullOrWhiteSpace(Singleton.Instance.InputArgs.Transformation) ? new Dictionary<string, string>() : Singleton.Instance.InputArgs.Transformation.Split(';').ToDictionary(r => r.Split('>')[0], r => r.Split('>')[1]);
-
-            foreach (var knownType in KnownTypes)
-            {
-                Mapping mapping = new Mapping();
-                mapping.Name = knownType.Name;
-                mapping.HumanizedName = mapping.Name.Humanize();
-                mapping.FullName = knownType.FullName;
-                mapping.IsMainType = mainTypes.Contains(knownType);
-                mapping.IsEnum = knownType.IsEnum;
-                mapping.Assembly = knownType.Assembly.FullName;
-                mapping.Mappings = knownType.GetProperties().Select(delegate (PropertyInfo info)
-                {
-                    PropertyMapping pMap = new PropertyMapping();
-
-                    pMap.Name = info.Name;
-                    if (transformation.ContainsKey(info.Name))
-                    {
-                        pMap.TransformName = transformation[info.Name];
-                    }
-
-                    pMap.HumanizedName = info.Name.Humanize();
-                    pMap.IsGeneric = info.PropertyType.IsGenericType;
-                    pMap.IsEnum = (info.PropertyType.IsEnum || info.PropertyType.IsNullableEnum());
-                    pMap.IsNullable = info.PropertyType.IsGenericType && info.PropertyType.GetGenericTypeDefinition() == typeof(Nullable<>);
-                    
-                    pMap.Attributes = info.CustomAttributes.Select(f => f.AttributeType.Name).Distinct().ToList();
-                    
-                    pMap.IsList = info.PropertyType.IsGenericType &&
-                         (
-                             info.PropertyType.GetGenericTypeDefinition() == typeof(List<>)
-                            || info.PropertyType.GetGenericTypeDefinition() == typeof(IList<>)
-                            || info.PropertyType.GetGenericTypeDefinition() == typeof(ICollection<>)
-                            || info.PropertyType.GetGenericTypeDefinition() == typeof(IEnumerable<>)
-                         );
-
-                    pMap.IsDictionary = info.PropertyType.IsGenericType &&
-                    (
-                        info.PropertyType.GetGenericTypeDefinition() == typeof(Dictionary<,>)
-                        || info.PropertyType.GetGenericTypeDefinition() == typeof(IDictionary<,>)
-                    );
-
-                    if (pMap.IsDictionary)
-                    {
-                        pMap.DictionaryTypes = info.PropertyType.GenericTypeArguments.Select(r => r.Name).ToList();
-                    }
-
-                    if (pMap.IsGeneric)
-                    {
-                        pMap.Type = info.PropertyType.GetGenericArguments().FirstOrDefault().Name;
-                    }
                     else
                     {
-                        pMap.Type = info.PropertyType.Name;
+                        if (KnownTypes.Contains(propertyInfo.PropertyType))
+                        {
+                            continue;
+                        }
+                        else
+                        {
+                            KnownTypes.Add(propertyInfo.PropertyType);
+                            doINeedToContinue++;
+                        }
                     }
-
-                    return pMap;
-                }).ToList();
-
-                mappings.Add(mapping);
+                }
             }
-            Singleton.Instance.MappingList = mappings;
-            await File.WriteAllTextAsync(Singleton.Instance.InputArgs.MappingFile, JsonConvert.SerializeObject(mappings));
+
+            stillLookingUp = doINeedToContinue > 0;
         }
+
+        KnownTypes.RemoveAll(r => r.Assembly == typeof(DateTime).Assembly);
+
+        List<Mapping> mappings = new List<Mapping>();
+
+        Dictionary<string, string> transformation = string.IsNullOrWhiteSpace(Singleton.Instance.InputArgs.Transformation) ? new Dictionary<string, string>() : Singleton.Instance.InputArgs.Transformation.Split(';').ToDictionary(r => r.Split('>')[0], r => r.Split('>')[1]);
+
+        foreach (var knownType in KnownTypes)
+        {
+            Mapping mapping = new Mapping();
+            mapping.Name = knownType.Name;
+            mapping.HumanizedName = mapping.Name.Humanize();
+            mapping.FullName = knownType.FullName;
+            mapping.IsMainType = mainTypes.Contains(knownType);
+            mapping.IsEnum = knownType.IsEnum;
+            mapping.Assembly = knownType.Assembly.FullName;
+            mapping.Mappings = knownType.GetProperties().Select(delegate (PropertyInfo info)
+            {
+                PropertyMapping pMap = new PropertyMapping();
+
+                pMap.Name = info.Name;
+                if (transformation.TryGetValue(info.Name, out var value))
+                {
+                    pMap.TransformName = value;
+                }
+
+                pMap.HumanizedName = info.Name.Humanize();
+                pMap.IsGeneric = info.PropertyType.IsGenericType;
+                pMap.IsEnum = (info.PropertyType.IsEnum || info.PropertyType.IsNullableEnum());
+                pMap.IsNullable = info.PropertyType.IsGenericType && info.PropertyType.GetGenericTypeDefinition() == typeof(Nullable<>);
+                    
+                pMap.Attributes = info.CustomAttributes.Select(f => f.AttributeType.Name).Distinct().ToList();
+                    
+                pMap.IsList = info.PropertyType.IsGenericType &&
+                              (
+                                  info.PropertyType.GetGenericTypeDefinition() == typeof(List<>)
+                                  || info.PropertyType.GetGenericTypeDefinition() == typeof(IList<>)
+                                  || info.PropertyType.GetGenericTypeDefinition() == typeof(ICollection<>)
+                                  || info.PropertyType.GetGenericTypeDefinition() == typeof(IEnumerable<>)
+                              );
+
+                pMap.IsDictionary = info.PropertyType.IsGenericType &&
+                                    (
+                                        info.PropertyType.GetGenericTypeDefinition() == typeof(Dictionary<,>)
+                                        || info.PropertyType.GetGenericTypeDefinition() == typeof(IDictionary<,>)
+                                    );
+
+                if (pMap.IsDictionary)
+                {
+                    var dictionaryArgs = info.PropertyType.GenericTypeArguments;
+                    if (dictionaryArgs.Length > 0) pMap.DictionaryKeyType = dictionaryArgs[0].Name;
+                    if (dictionaryArgs.Length > 1) pMap.DictionaryValueType = dictionaryArgs[1].Name;
+                }
+
+                if (pMap.IsGeneric)
+                {
+                    pMap.Type = info.PropertyType.GetGenericArguments().FirstOrDefault().Name;
+                }
+                else
+                {
+                    pMap.Type = info.PropertyType.Name;
+                }
+
+                return pMap;
+            }).ToList();
+
+            mappings.Add(mapping);
+        }
+        Singleton.Instance.MappingList = mappings;
+        await File.WriteAllTextAsync(Singleton.Instance.InputArgs.MappingFile, JsonConvert.SerializeObject(mappings));
     }
 }

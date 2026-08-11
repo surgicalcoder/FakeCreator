@@ -9,7 +9,7 @@ namespace FakeCreatorCore
     {
         private static readonly Lazy<Singleton> lazy = new Lazy<Singleton>(() => new Singleton());
         public static Singleton Instance => lazy.Value;
-
+    
         private Singleton()
         {
             OutputGenerators = new List<IOutputGenerator>();
@@ -17,6 +17,7 @@ namespace FakeCreatorCore
 
         public InputArgs InputArgs { get; set; }
         public List<Mapping> MappingList { get; set; }
+        public Dictionary<string, Mapping> MappingIndex { get; set; }
         public List<Assembly> Assemblies { get; set; }
         public List<IOutputGenerator> OutputGenerators { get; set; }
     }

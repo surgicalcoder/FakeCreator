@@ -253,3 +253,5 @@ paket-files/
 *.sln.iml
 
 FakeCreatorCore/Properties/launchSettings.json
+
+.agentbridge/

@@ -6,6 +6,13 @@ namespace FakeCreatorCore
 {
     public static class Helpers
     {
+        private static readonly HashSet<string> BaseTypes = new HashSet<string>
+        {
+            "Boolean", "Byte", "Char", "DateTime", "DateTimeOffset", "Decimal",
+            "Double", "Int16", "Int32", "Int64", "SByte", "Single", "String",
+            "UInt16", "UInt32", "UInt64"
+        };
+
         public static bool IsTypeAGenericSimpleType(this Type typeToCheck)
         {
             return typeToCheck.IsGenericType && typeToCheck.GetGenericArguments().All(r=>IsTypeASimpleType(r));
@@ -13,24 +20,7 @@ namespace FakeCreatorCore
 
         public static bool IsASimpleType(this string value)
         {
-            List<string> baseTypes = new List<string> {"Boolean",
-                "Byte",
-                "Char",
-                "DateTime",
-                "DateTimeOffset",
-                "Decimal",
-                "Double",
-                "Int16",
-                "Int32",
-                "Int64",
-                "SByte",
-                "Single",
-                "String",
-                "UInt16",
-                "UInt32",
-                "UInt64"};
-
-            return baseTypes.Contains(value);
+            return value != null && BaseTypes.Contains(value);
         }
 
 

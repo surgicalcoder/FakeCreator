@@ -18,6 +18,8 @@ namespace FakeCreatorCore
 
         public bool IsDictionary { get; set; }
 
-        public List<string> DictionaryTypes { get; set; }
+        public string DictionaryKeyType { get; set; }
+
+        public string DictionaryValueType { get; set; }
     }
 }

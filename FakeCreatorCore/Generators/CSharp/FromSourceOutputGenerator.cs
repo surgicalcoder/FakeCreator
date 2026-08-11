@@ -1,5 +1,4 @@
 using System;
-using System.Linq;
 using System.Text;
 
 namespace FakeCreatorCore.Generators.CSharp
@@ -13,6 +12,13 @@ namespace FakeCreatorCore.Generators.CSharp
         private static string GetRemotePopulatorMethodName(string outputTypeName)
         {
             return "Populate" + outputTypeName + "FromSource";
+        }
+
+        private static string BuildDictEntry(string typeName, string sourceAccessor)
+        {
+            if (string.IsNullOrWhiteSpace(typeName) || typeName.IsASimpleType())
+                return $"pair=> pair.{sourceAccessor}";
+            return $"pair=> {GetRemotePopulatorMethodName(typeName)}(pair.{sourceAccessor})";
         }
 
         public string GetFileExtension(Mapping mapping)
@@ -85,47 +91,12 @@ namespace FakeCreatorCore.Generators.CSharp
                     }
                     else if (propertyMapping.IsDictionary)
                     {
-                        var dictLine = $"\tif (remote.{remotePropertyName} != null && remote.{remotePropertyName}.Any()) {{";
-
-                        dictLine = dictLine + $"local.{localPropertyName} = remote.{remotePropertyName}.ToDictionary(";
-
-                        foreach (var dictionaryType in propertyMapping.DictionaryTypes)
-                        {
-                            int index = propertyMapping.DictionaryTypes.IndexOf(dictionaryType);
-
-                            if (dictionaryType.IsASimpleType())
-                            {
-
-                                dictLine = dictLine + $"pair=>";
-                                if (index == 0)
-                                {
-                                    dictLine = dictLine + $"pair.Key";
-                                }
-                                else
-                                {
-                                    dictLine = dictLine + $"pair.Value";
-                                }
-                            }
-                            else
-                            {
-                                dictLine = dictLine + $"pair=>";
-                                if (index == 0)
-                                {
-                                    dictLine = dictLine + $"{GetRemotePopulatorMethodName(dictionaryType)}(pair.Key)";
-                                }
-                                else
-                                {
-                                    dictLine = dictLine + $"{GetRemotePopulatorMethodName(dictionaryType)}(pair.Value)";
-                                }
-                            }
-                            dictLine = dictLine + $",";
-                        }
-                        if (dictLine.EndsWith(","))
-                        {
-                            dictLine = dictLine.Substring(0, dictLine.Length - 1);
-                        }
-
-                        dictLine = dictLine + " }";
+                        string dictLine = $"\tif (remote.{remotePropertyName} != null && remote.{remotePropertyName}.Any()) {{";
+                        dictLine += $"local.{localPropertyName} = remote.{remotePropertyName}.ToDictionary(";
+                        dictLine += BuildDictEntry(propertyMapping.DictionaryKeyType, "Key");
+                        dictLine += ", ";
+                        dictLine += BuildDictEntry(propertyMapping.DictionaryValueType, "Value");
+                        dictLine += "); }}";
 
                         builder.AppendLine(dictLine);
                     }
@@ -137,9 +108,7 @@ namespace FakeCreatorCore.Generators.CSharp
                         }
                         else
                         {
-                            var internalMapping = Singleton.Instance.MappingList.FirstOrDefault(r => r.Name == propertyMapping.Type);
-
-                            if (internalMapping != null && internalMapping.IsAReference)
+                            if (Singleton.Instance.MappingIndex != null && Singleton.Instance.MappingIndex.TryGetValue(propertyMapping.Type, out var internalMapping) && internalMapping.IsAReference)
                             {
                                 builder.AppendLine(
                                     $"\tif (remote.{remotePropertyName} != null && remote.{remotePropertyName}.Any()) {{ local.{localPropertyName} = remote.{remotePropertyName}.Select(r=> {string.Format(Singleton.Instance.InputArgs.IsAReferenceTypeFormat, localPropertyType, Singleton.Instance.InputArgs.IsAReferenceTypeLookupKey)} ).ToList();  }} ");
@@ -167,9 +136,7 @@ namespace FakeCreatorCore.Generators.CSharp
                         }
                         else
                         {
-                            var internalMapping = Singleton.Instance.MappingList.FirstOrDefault(r => r.Name == propertyMapping.Type);
-
-                            if (internalMapping != null && internalMapping.IsAReference)
+                            if (Singleton.Instance.MappingIndex != null && Singleton.Instance.MappingIndex.TryGetValue(propertyMapping.Type, out var internalMapping) && internalMapping.IsAReference)
                             {
                                 builder.AppendLine(
                                     $"\tif (remote.{remotePropertyName} != null) {{ local.{localPropertyName} = {string.Format(Singleton.Instance.InputArgs.IsAReferenceTypeFormat, localPropertyType, Singleton.Instance.InputArgs.IsAReferenceTypeLookupKey)};  }}");

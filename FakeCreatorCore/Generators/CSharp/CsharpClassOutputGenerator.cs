@@ -38,9 +38,7 @@ namespace FakeCreatorCore.Generators.CSharp
                 }
                 else
                 {
-                    var internalMapping = Singleton.Instance.MappingList.FirstOrDefault(r => r.Name == propertyMapping.Type);
-
-                    if (internalMapping != null && internalMapping.IsAReference)
+                    if (Singleton.Instance.MappingIndex != null && Singleton.Instance.MappingIndex.TryGetValue(propertyMapping.Type, out var internalMapping) && internalMapping.IsAReference)
                     {
                         propertyType = String.Format(Singleton.Instance.InputArgs.IsAReferenceTypeKey, Singleton.Instance.InputArgs.ClassPrefix + propertyMapping.Type + Singleton.Instance.InputArgs.ClassPostfix);
                     }
@@ -66,7 +64,7 @@ namespace FakeCreatorCore.Generators.CSharp
                 }
                 else if (propertyMapping.IsDictionary)
                 {
-                    builder.AppendLine($"\tpublic Dictionary<{propertyMapping.DictionaryTypes.FirstOrDefault()},{propertyMapping.DictionaryTypes.Skip(1).FirstOrDefault()}> {propertyName} {{get; set;}}");
+                    builder.AppendLine($"\tpublic Dictionary<{propertyMapping.DictionaryKeyType}, {propertyMapping.DictionaryValueType}> {propertyName} {{get; set;}}");
                 }
                 else
                 {

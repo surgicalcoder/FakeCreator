@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Newtonsoft.Json;
 
 namespace FakeCreatorCore
 {
@@ -20,12 +21,18 @@ namespace FakeCreatorCore
             return $"{nameof(Name)}: {Name}";
         }
 
+        [JsonIgnore]
+        private Type _fetchedType;
+
         public Type Fetch()
         {
+            if (_fetchedType != null)
+                return _fetchedType;
+
             var assembly = AppDomain.CurrentDomain.GetAssemblies().FirstOrDefault(r => r.FullName == this.Assembly);
             var type = assembly?.GetTypes().FirstOrDefault(r => r.Name == this.Name);
 
-            return type;
+            return _fetchedType = type;
         }
     }
 }
