@@ -43,6 +43,10 @@ namespace FakeCreatorCore
         [ArgDefaultValue(false)]
         public bool SkipBuiltinGenerators { get; set; }
 
+        [ArgDefaultValue(false)]
+        [ArgDescription("Disables RazorLight template compilation caching (dev-time stale-template fix).")]
+        public bool NoCache { get; set; }
+
         public List<string> IgnoreTypesFromNamespace { get; set; } = new();
 
     }

@@ -145,11 +145,14 @@ class Program
     {
         if (_razorEngine == null)
         {
-            _razorEngine = new RazorLightEngineBuilder()
+            var builder = new RazorLightEngineBuilder()
                           .UseFileSystemProject(Singleton.Instance.InputArgs.TemplateDirectory)
-                          .SetOperatingAssembly(typeof(Program).Assembly)
-                          .UseMemoryCachingProvider()
-                          .Build();
+                          .SetOperatingAssembly(typeof(Program).Assembly);
+            if (!Singleton.Instance.InputArgs.NoCache)
+            {
+                builder.UseMemoryCachingProvider();
+            }
+            _razorEngine = builder.Build();
         }
 
         string result = await _razorEngine.CompileRenderStringAsync(fileName, templateContents, mapping);
@@ -250,7 +253,16 @@ class Program
                 pMap.IsNullable = info.PropertyType.IsGenericType && info.PropertyType.GetGenericTypeDefinition() == typeof(Nullable<>);
                     
                 pMap.Attributes = info.CustomAttributes.Select(f => f.AttributeType.Name).Distinct().ToList();
-                    
+
+                if (pMap.IsEnum)
+                {
+                    var enumType = Nullable.GetUnderlyingType(info.PropertyType) ?? info.PropertyType;
+                    if (enumType != null && enumType.IsEnum)
+                    {
+                        pMap.EnumValues = System.Enum.GetNames(enumType).ToList();
+                    }
+                }
+
                 pMap.IsList = info.PropertyType.IsGenericType &&
                               (
                                   info.PropertyType.GetGenericTypeDefinition() == typeof(List<>)

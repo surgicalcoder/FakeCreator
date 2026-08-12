@@ -21,6 +21,8 @@ namespace FakeCreatorCore
 
         public List<string> Attributes { get; set; }
 
+        public List<string> EnumValues { get; set; }
+
         public bool IsDictionary { get; set; }
 
         public List<string> DictionaryTypes { get; set; }
